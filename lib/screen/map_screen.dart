@@ -5,6 +5,7 @@ import '../../services/graphhopper_service.dart';
 import '../../services/distance_api_service.dart';
 import '../../models/distance_result_model.dart';
 import '../widgets/route_card.dart';
+import 'package:geolocator/geolocator.dart'; // إضافة مكتبة geolocator
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -43,6 +44,16 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   BitmapDescriptor endIcon = BitmapDescriptor.defaultMarkerWithHue(
     BitmapDescriptor.hueRed,
   );
+  BitmapDescriptor driverIcon = BitmapDescriptor.defaultMarkerWithHue(
+    BitmapDescriptor.hueAzure, // رمز السيارة
+  );
+
+  List<LatLng> drivers = [
+    LatLng(33.5140, 36.2767), // مواقع السيارات
+    LatLng(33.5150, 36.2770),
+    LatLng(33.5125, 36.2750),
+    LatLng(33.5160, 36.2780),
+  ];
 
   @override
   void initState() {
@@ -58,12 +69,77 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       if (count < 2) return;
       setState(() => animatedRoute = _polylines.first.points.sublist(0, count));
     });
+
+    _getCurrentLocation();
+    _addDriverMarkers();  // إضافة الماركرات الخاصة بالسيارات
+  }
+
+  // إضافة الماركرات الخاصة بالسيارات المتواجدة
+  void _addDriverMarkers() {
+    for (int i = 0; i < drivers.length; i++) {
+      _markers.add(
+        Marker(
+          markerId: MarkerId('driver_$i'),  // تعيين معرف فريد لكل سيارة
+          position: drivers[i],
+          icon: driverIcon,  // تخصيص الأيقونة
+          infoWindow: InfoWindow(
+            title: "سيارة ${i + 1}",
+            snippet: "الموقع: ${drivers[i].latitude}, ${drivers[i].longitude}",
+          ),
+        ),
+      );
+    }
   }
 
   @override
   void dispose() {
     polyAnimController.dispose();
     super.dispose();
+  }
+
+
+  Future<void> _getCurrentLocation() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+
+      return;
+    }
+
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission != LocationPermission.whileInUse &&
+          permission != LocationPermission.always) {
+        return;
+      }
+    }
+
+
+    Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high);
+
+
+    setState(() {
+      startPoint = LatLng(position.latitude, position.longitude);
+      _markers.add(
+        Marker(
+          markerId: const MarkerId('start'),
+          position: startPoint!,
+          icon: startIcon,
+        ),
+      );
+      // يمكنك تحديث الكاميرا على الموقع الجديد
+      _controller.future.then((controller) {
+        controller.animateCamera(
+          CameraUpdate.newLatLngZoom(startPoint!, 14),
+        );
+      });
+    });
   }
 
   void _addMarker(LatLng pos) async {
@@ -148,7 +224,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text("تم تأكيد الرحلة")));
-      // إضافة أي منطق إرسال الرحلة هنا
+
     }
   }
 
