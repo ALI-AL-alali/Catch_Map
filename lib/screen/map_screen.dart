@@ -5,7 +5,9 @@ import '../../services/graphhopper_service.dart';
 import '../../services/distance_api_service.dart';
 import '../../models/distance_result_model.dart';
 import '../widgets/route_card.dart';
-import 'package:geolocator/geolocator.dart'; // إضافة مكتبة geolocator
+import 'package:geolocator/geolocator.dart';
+
+import 'get_driver_screen.dart'; // إضافة مكتبة geolocator
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -224,7 +226,11 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text("تم تأكيد الرحلة")));
-
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => MockOffersScreen(),
+        ),
+      );
     }
   }
 
