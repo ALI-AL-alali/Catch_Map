@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:map/const/endpoint.dart';
+import 'package:map/core/const/endpoint.dart';
 import '../models/distance_result_model.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 

@@ -80,7 +80,6 @@ class _AnimatedDriverCardState extends State<AnimatedDriverCard>
   void initState() {
     super.initState();
 
-    // تحديث واجهة المستخدم بشكل متزامن مع المؤقت لتحديث تأثير الانسحاب اللوني
     _uiUpdateTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
       if (mounted) setState(() {});
     });
@@ -90,9 +89,10 @@ class _AnimatedDriverCardState extends State<AnimatedDriverCard>
       duration: const Duration(milliseconds: 700),
     );
 
-    _slide = Tween<Offset>(begin: const Offset(1.2, 0), end: Offset.zero)
-        .chain(CurveTween(curve: Curves.easeOutBack))
-        .animate(_enterController);
+    _slide = Tween<Offset>(
+      begin: const Offset(1.2, 0),
+      end: Offset.zero,
+    ).chain(CurveTween(curve: Curves.easeOutBack)).animate(_enterController);
 
     _fade = Tween<double>(begin: 0, end: 1).animate(_enterController);
     _scale = Tween<double>(begin: 0.95, end: 1.0).animate(_enterController);
@@ -127,20 +127,23 @@ class _AnimatedDriverCardState extends State<AnimatedDriverCard>
       end: const Offset(-2.0, 1.0),
     ).animate(CurvedAnimation(parent: _exitController!, curve: Curves.easeIn));
 
-    _rotateOut = Tween<double>(begin: 0, end: 0.3).animate(
-      CurvedAnimation(parent: _exitController!, curve: Curves.easeIn),
-    );
+    _rotateOut = Tween<double>(
+      begin: 0,
+      end: 0.3,
+    ).animate(CurvedAnimation(parent: _exitController!, curve: Curves.easeIn));
 
     _sizeAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
       CurvedAnimation(
-          parent: _exitController!,
-          curve: const Interval(0.5, 1.0, curve: Curves.easeOut)),
+        parent: _exitController!,
+        curve: const Interval(0.5, 1.0, curve: Curves.easeOut),
+      ),
     );
 
     _fadeExitAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
       CurvedAnimation(
-          parent: _exitController!,
-          curve: const Interval(0.5, 1.0, curve: Curves.easeOut)),
+        parent: _exitController!,
+        curve: const Interval(0.5, 1.0, curve: Curves.easeOut),
+      ),
     );
 
     _exitController!.addStatusListener((status) {
@@ -170,20 +173,23 @@ class _AnimatedDriverCardState extends State<AnimatedDriverCard>
       end: const Offset(2.0, 1.0),
     ).animate(CurvedAnimation(parent: _exitController!, curve: Curves.easeIn));
 
-    _rotateOut = Tween<double>(begin: 0, end: -0.3).animate(
-      CurvedAnimation(parent: _exitController!, curve: Curves.easeIn),
-    );
+    _rotateOut = Tween<double>(
+      begin: 0,
+      end: -0.3,
+    ).animate(CurvedAnimation(parent: _exitController!, curve: Curves.easeIn));
 
     _sizeAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
       CurvedAnimation(
-          parent: _exitController!,
-          curve: const Interval(0.5, 1.0, curve: Curves.easeOut)),
+        parent: _exitController!,
+        curve: const Interval(0.5, 1.0, curve: Curves.easeOut),
+      ),
     );
 
     _fadeExitAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
       CurvedAnimation(
-          parent: _exitController!,
-          curve: const Interval(0.5, 1.0, curve: Curves.easeOut)),
+        parent: _exitController!,
+        curve: const Interval(0.5, 1.0, curve: Curves.easeOut),
+      ),
     );
 
     _exitController!.addStatusListener((status) {
@@ -199,9 +205,7 @@ class _AnimatedDriverCardState extends State<AnimatedDriverCard>
   @override
   Widget build(BuildContext context) {
     final item = widget.driverItem;
-
-    // حساب نسبة التقدم (0.0 في البداية، 1.0 في النهاية)
-    double progress = (item.totalSeconds - item.remainingSeconds) / item.totalSeconds;
+    double progress = item.remainingSeconds / item.totalSeconds;
 
     Widget cardContent = Card(
       elevation: 4,
@@ -212,7 +216,6 @@ class _AnimatedDriverCardState extends State<AnimatedDriverCard>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // صورة واسم السائق
             Row(
               children: [
                 ClipOval(
@@ -222,33 +225,47 @@ class _AnimatedDriverCardState extends State<AnimatedDriverCard>
                     height: 50,
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) =>
-                    const Icon(Icons.person_pin, size: 50, color: Colors.blue),
+                        const Icon(Icons.person, size: 50),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(item.driverMockName,
-                        style: const TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold)),
-                    Text("تقييم 4.8 ⭐",
-                        style: TextStyle(
-                            fontSize: 14, color: Colors.amber.shade700)),
+                    Text(
+                      item.driverMockName,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      "تقييم 4.8 ⭐",
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.amber.shade700,
+                      ),
+                    ),
                   ],
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            Text("السعر المبدئي: ${item.basePrice} ل.س",
-                style: const TextStyle(color: Colors.grey)),
+            Text(
+              "السعر المبدئي: ${item.basePrice} ل.س",
+              style: const TextStyle(color: Colors.grey),
+            ),
             if (item.driverPrice != null)
-              Text("عرض السائق: ${item.driverPrice} ل.س",
-                  style: const TextStyle(
-                      color: Colors.green, fontWeight: FontWeight.bold)),
+              Text(
+                "عرض السائق: ${item.driverPrice} ل.س",
+                style: const TextStyle(
+                  color: Colors.green,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             const SizedBox(height: 12),
 
-            // أزرار الرفض والقبول (القسم المعدل)
+            const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
@@ -265,45 +282,46 @@ class _AnimatedDriverCardState extends State<AnimatedDriverCard>
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Stack( // استخدم Stack لدمج شريط التقدم مع الزر
-                    alignment: Alignment.center,
-                    children: [
-                      // 1. شريط التقدم (الخلفية المتغيرة)
-                      SizedBox(
-                        height: 48,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: LinearProgressIndicator(
-                            // قيمة الشريط تبدأ من 1.0 وتقل إلى 0.0 (لإحداث تأثير الانسحاب)
-                            value: 1.0 - progress,
-                            // اللون الفاتح هو لون الخلفية
-                            backgroundColor: Colors.green.shade200,
-                            // اللون الداكن هو اللون الذي ينسحب (المساحة المتبقية)
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.green.shade700),
-                            minHeight: 48,
-                          ),
-                        ),
-                      ),
-
-                      // 2. الزر الفعلي (خلفية شفافة لتظهر الخلفية المتحركة)
-                      SizedBox(
-                        height: 48,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.transparent, // خلفية شفافة
-                            foregroundColor: Colors.white,
-                            elevation: 0, // إزالة الظل
-                            shadowColor: Colors.transparent,
-                            shape: RoundedRectangleBorder(
+                  child: GestureDetector(
+                    onTap: isExiting ? null : acceptWithAnimation,
+                    child: SizedBox(
+                      height: 48,
+                      child: Stack(
+                        children: [
+                          // الخلفية الكاملة فاتحة
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.green.shade200,
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            minimumSize: const Size(double.infinity, 48),
                           ),
-                          onPressed: isExiting ? null : acceptWithAnimation,
-                          child: const Text("قبول"),
-                        ),
+                          // الجزء المتبقي (اللون الغامق) يتناقص مع الوقت
+                          FractionallySizedBox(
+                            alignment:
+                                Alignment.centerRight, // يمشي من اليمين لليسار
+                            widthFactor:
+                                progress, // كل ما ينقص الوقت، هذا يتناقص
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade700,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                          ),
+                          // النص فوقها
+                          Center(
+                            child: Text(
+                              "قبول",
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ],
@@ -313,7 +331,6 @@ class _AnimatedDriverCardState extends State<AnimatedDriverCard>
       ),
     );
 
-    // حالة الانسحاب مع تزامن اللون
     if (isExiting && _sizeAnimation != null && _fadeExitAnimation != null) {
       Widget animatedExit = Transform.rotate(
         angle: _rotateOut!.value,
@@ -323,11 +340,13 @@ class _AnimatedDriverCardState extends State<AnimatedDriverCard>
       return FadeTransition(
         opacity: _fadeExitAnimation!,
         child: SizeTransition(
-            sizeFactor: _sizeAnimation!, axisAlignment: -1, child: animatedExit),
+          sizeFactor: _sizeAnimation!,
+          axisAlignment: -1,
+          child: animatedExit,
+        ),
       );
     }
 
-    // العرض الطبيعي للكارد مع دخول متحرك
     return FadeTransition(
       opacity: _fade,
       child: SlideTransition(
@@ -338,9 +357,11 @@ class _AnimatedDriverCardState extends State<AnimatedDriverCard>
   }
 }
 
-// ---------------- Mock Offers Screen ----------------
+// ---------------- MockOffersScreen (Overlay) ----------------
 class MockOffersScreen extends StatefulWidget {
-  const MockOffersScreen({super.key});
+  final VoidCallback? onClose;
+
+  const MockOffersScreen({super.key, this.onClose});
 
   @override
   State<MockOffersScreen> createState() => _MockOffersScreenState();
@@ -356,14 +377,24 @@ class _MockOffersScreenState extends State<MockOffersScreen> {
       "price": 25000,
     },
     {
-      "name": "driver2 ",
+      "name": "driver2",
       "image": "https://i.pravatar.cc/150?img=5",
       "price": 22000,
     },
     {
-      "name": " driver3",
+      "name": "driver3",
       "image": "https://i.pravatar.cc/150?img=7",
       "price": 27000,
+    },
+    {
+      "name": "driver4",
+      "image": "https://i.pravatar.cc/150?img=8",
+      "price": 28000,
+    },
+    {
+      "name": "driver5",
+      "image": "https://i.pravatar.cc/150?img=9",
+      "price": 23000,
     },
   ];
 
@@ -375,7 +406,7 @@ class _MockOffersScreenState extends State<MockOffersScreen> {
 
   void _addMockDriversSequentially() async {
     for (var i = 0; i < mockDrivers.length; i++) {
-      await Future.delayed(const Duration(seconds: 1));
+      await Future.delayed(const Duration(seconds: 2));
       final driver = mockDrivers[i];
       final item = DriverItem(
         driverEmail: "driver_$i",
@@ -389,9 +420,7 @@ class _MockOffersScreenState extends State<MockOffersScreen> {
       item.onRemoveWithAnimation = () => _removeOfferItem(item);
 
       if (!mounted) return;
-      setState(() {
-        activeOffers.add(item);
-      });
+      setState(() => activeOffers.add(item));
 
       item.startTimer(() {
         if (mounted) _removeOfferItem(item);
@@ -402,44 +431,65 @@ class _MockOffersScreenState extends State<MockOffersScreen> {
   void _removeOfferItem(DriverItem item) {
     item.cancelTimer();
     if (!mounted) return;
-    setState(() {
-      activeOffers.remove(item);
-    });
+    setState(() => activeOffers.remove(item));
   }
 
   void _acceptOffer(String driverEmail) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("تم اختيار السائق: $driverEmail")),
-    );
-    Navigator.of(context).pop();
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text("تم اختيار السائق: $driverEmail")));
+    if (widget.onClose != null) widget.onClose!();
   }
 
   @override
   void dispose() {
-    for (var offer in activeOffers) {
-      offer.cancelTimer();
-    }
+    for (var offer in activeOffers) offer.cancelTimer();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("السائقين")),
-      body: activeOffers.isEmpty
-          ? const Center(child: Text("جاري جلب العروض..."))
-          : ListView(
-        children: activeOffers
-            .map(
-              (item) => AnimatedDriverCard(
-            key: ValueKey(item.driverEmail),
-            driverItem: item,
-            onAccept: () => _acceptOffer(item.driverEmail),
-            onReject: () => item.onRemoveWithAnimation?.call(),
+    final height = MediaQuery.of(context).size.height;
+    return Material(
+      color: Colors.black.withOpacity(0.5),
+      child: SafeArea(
+        child: SizedBox(
+          height: height * 0.65, // ارتفاع Overlay مثل CustomerRideScreen
+          child: Column(
+            children: [
+              Align(
+                alignment: Alignment.topRight,
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white),
+                  onPressed: widget.onClose,
+                ),
+              ),
+              Expanded(
+                child: activeOffers.isEmpty
+                    ? const Center(
+                        child: Text(
+                          "جاري جلب العروض...",
+                          style: TextStyle(color: Colors.white, fontSize: 18),
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        itemCount: activeOffers.length,
+                        itemBuilder: (_, index) {
+                          final item = activeOffers[index];
+                          return AnimatedDriverCard(
+                            key: ValueKey(item.driverEmail),
+                            driverItem: item,
+                            onAccept: () => _acceptOffer(item.driverEmail),
+                            onReject: () => item.onRemoveWithAnimation?.call(),
+                          );
+                        },
+                      ),
+              ),
+            ],
           ),
-        )
-            .toList(),
+        ),
       ),
     );
   }

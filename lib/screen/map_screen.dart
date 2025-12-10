@@ -20,6 +20,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   final Completer<GoogleMapController> _controller = Completer();
   final Set<Marker> _markers = {};
   final Set<Polyline> _polylines = {};
+  bool showDriversOverlay = false; // يتحكم بظهور Overlay السائقين
 
   late AnimationController polyAnimController;
   List<LatLng> animatedRoute = [];
@@ -73,7 +74,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     });
 
     _getCurrentLocation();
-    _addDriverMarkers();  // إضافة الماركرات الخاصة بالسيارات
+    _addDriverMarkers(); // إضافة الماركرات الخاصة بالسيارات
   }
 
   // إضافة الماركرات الخاصة بالسيارات المتواجدة
@@ -81,9 +82,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     for (int i = 0; i < drivers.length; i++) {
       _markers.add(
         Marker(
-          markerId: MarkerId('driver_$i'),  // تعيين معرف فريد لكل سيارة
+          markerId: MarkerId('driver_$i'), // تعيين معرف فريد لكل سيارة
           position: drivers[i],
-          icon: driverIcon,  // تخصيص الأيقونة
+          icon: driverIcon, // تخصيص الأيقونة
           infoWindow: InfoWindow(
             title: "سيارة ${i + 1}",
             snippet: "الموقع: ${drivers[i].latitude}, ${drivers[i].longitude}",
@@ -99,18 +100,14 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     super.dispose();
   }
 
-
   Future<void> _getCurrentLocation() async {
     bool serviceEnabled;
     LocationPermission permission;
 
-
     serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-
       return;
     }
-
 
     permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
@@ -121,10 +118,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       }
     }
 
-
     Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high);
-
+      desiredAccuracy: LocationAccuracy.high,
+    );
 
     setState(() {
       startPoint = LatLng(position.latitude, position.longitude);
@@ -137,9 +133,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       );
       // يمكنك تحديث الكاميرا على الموقع الجديد
       _controller.future.then((controller) {
-        controller.animateCamera(
-          CameraUpdate.newLatLngZoom(startPoint!, 14),
-        );
+        controller.animateCamera(CameraUpdate.newLatLngZoom(startPoint!, 14));
       });
     });
   }
@@ -223,75 +217,253 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
   void _confirmTrip() {
     if (startPoint != null && endPoint != null) {
+      _showPriceAdjustmentSheet(); // هنا بنفتح البوتم شي
+    } else {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text("تم تأكيد الرحلة")));
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => MockOffersScreen(),
-        ),
-      );
+      ).showSnackBar(const SnackBar(content: Text("حدد نقطتين أولًا")));
     }
+
+    // if (startPoint != null && endPoint != null) {
+    //   ScaffoldMessenger.of(
+    //     context,
+    //   ).showSnackBar(const SnackBar(content: Text("تم تأكيد الرحلة")));
+    //   Navigator.of(context).push(
+    //     MaterialPageRoute(
+    //       builder: (_) => MockOffersScreen(),
+    //     ),
+    //   );
+    // }
   }
+
+  void _showPriceAdjustmentSheet() {
+    int price = serverResult?.calculated_price ?? 20000;
+
+    showModalBottomSheet(
+      context: context,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      isScrollControlled: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setStateSheet) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+                left: 16,
+                right: 16,
+                top: 16,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    "ضبط السعر قبل جلب السائقين",
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      IconButton(
+                        onPressed: () {
+                          setStateSheet(() {
+                            price = (price - 1000)
+                                .clamp(0, double.infinity)
+                                .toInt();
+                          });
+                        },
+                        icon: Icon(
+                          Icons.remove_circle,
+                          color: Colors.red,
+                          size: 36,
+                        ),
+                      ),
+                      SizedBox(width: 20),
+                      Text(
+                        "$price ل.س",
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      SizedBox(width: 20),
+                      IconButton(
+                        onPressed: () {
+                          setStateSheet(() {
+                            price += 1000;
+                          });
+                        },
+                        icon: Icon(
+                          Icons.add_circle,
+                          color: Colors.green,
+                          size: 36,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      // فتح واجهة السائقين كما هي بدون أي تعديل
+                      setState(() => showDriversOverlay = true);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: Size(double.infinity, 50),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text("جلب السائقين"),
+                  ),
+                  SizedBox(height: 16),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // void _showDriversSheet() {
+  //   showModalBottomSheet(
+  //     context: context,
+  //     shape: RoundedRectangleBorder(
+  //       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+  //     ),
+  //     isScrollControlled: true,
+  //     builder: (_) {
+  //       List<LatLng> driversInSheet = []; // قائمة السائقين داخل البوتم شي
+  //       return StatefulBuilder(
+  //         builder: (context, setStateSheet) {
+  //           return Padding(
+  //             padding: const EdgeInsets.all(16.0),
+  //             child: Column(
+  //               mainAxisSize: MainAxisSize.min,
+  //               children: [
+  //                 Text(
+  //                   "خيارات السائقين",
+  //                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+  //                 ),
+  //                 const SizedBox(height: 10),
+  //                 ElevatedButton(
+  //                   onPressed: () {
+  //                     if (startPoint != null && endPoint != null) {
+  //                       Navigator.of(context).pop();
+  //
+  //                       setState(() => showDriversOverlay = true); // عرض Overlay
+  //
+  //                     } else {
+  //                       ScaffoldMessenger.of(context).showSnackBar(
+  //                         const SnackBar(content: Text("حدد نقطتين أولًا")),
+  //                       );
+  //                     }
+  //                   },
+  //                   child: const Text("جلب السائقين"),
+  //                 ),                  const SizedBox(height: 10),
+  //                 // عرض السائقين بعد الضغط على الزر
+  //                 if (driversInSheet.isNotEmpty)
+  //                   ListView.builder(
+  //                     shrinkWrap: true,
+  //                     itemCount: driversInSheet.length,
+  //                     itemBuilder: (_, index) {
+  //                       return ListTile(
+  //                         leading: Icon(Icons.local_taxi, color: Colors.blue),
+  //                         title: Text("سائق ${index + 1}"),
+  //                         subtitle: Text(
+  //                             "الموقع: ${driversInSheet[index].latitude.toStringAsFixed(4)}, ${driversInSheet[index].longitude.toStringAsFixed(4)}"),
+  //                         onTap: () {
+  //                           Navigator.of(context).pop();
+  //                           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+  //                               content: Text("اخترت سائق ${index + 1}")));
+  //                         },
+  //                       );
+  //                     },
+  //                   ),
+  //               ],
+  //             ),
+  //           );
+  //         },
+  //       );
+  //     },
+  //   );
+  // }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("حدد نقطتين على الخريطة")),
-      body: Stack(
-        children: [
-          GoogleMap(
-            initialCameraPosition: _initialPosition,
-            onMapCreated: (controller) => _controller.complete(controller),
-            markers: _markers,
-            polylines: {
-              if (animatedRoute.isNotEmpty)
-                Polyline(
-                  polylineId: const PolylineId('animate'),
-                  points: animatedRoute,
-                  width: 4,
-                  color: Colors.black,
-                ),
-            },
-            onTap: _addMarker,
-            myLocationEnabled: true,
-            zoomControlsEnabled: true,
-          ),
-          if (serverResult != null)
-            Positioned(
-              top: 10,
-              left: 0,
-              right: 0,
-              child: RouteCard(
-                fromName: serverResult!.fromName,
-                toName: serverResult!.toName,
-                distance: serverResult!.distanceKm,
-                duration: serverResult!.durationMin,
+    return Stack(
+      children: [
+        Scaffold(
+          appBar: AppBar(title: const Text("حدد نقطتين على الخريطة")),
+          body: Stack(
+            children: [
+              GoogleMap(
+                initialCameraPosition: _initialPosition,
+                onMapCreated: (controller) => _controller.complete(controller),
+                markers: _markers,
+                polylines: {
+                  if (animatedRoute.isNotEmpty)
+                    Polyline(
+                      polylineId: const PolylineId('animate'),
+                      points: animatedRoute,
+                      width: 4,
+                      color: Colors.black,
+                    ),
+                },
+                onTap: _addMarker,
+                myLocationEnabled: true,
+                zoomControlsEnabled: true,
               ),
-            ),
-        ],
-      ),
-      bottomNavigationBar: Padding(
-        padding: const EdgeInsets.all(12),
-        child: ElevatedButton(
-          onPressed: _confirmTrip,
-          style: ElevatedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            backgroundColor: Colors.green,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
+              if (serverResult != null)
+                Positioned(
+                  top: 10,
+                  left: 0,
+                  right: 0,
+                  child: RouteCard(
+                    fromName: serverResult!.fromName,
+                    toName: serverResult!.toName,
+                    distance: serverResult!.distanceKm,
+                    duration: serverResult!.durationMin,
+                  ),
+                ),
+            ],
           ),
-          child: const Text(
-            "تأكيد الرحلة",
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
+          bottomNavigationBar: Padding(
+            padding: const EdgeInsets.all(12),
+            child: ElevatedButton(
+              onPressed: _confirmTrip,
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                backgroundColor: Colors.green,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text(
+                "تأكيد الرحلة",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
             ),
           ),
         ),
-      ),
+
+        if (showDriversOverlay)
+          Positioned.fill(
+            child: Container(
+              color: Colors.black.withOpacity(0.5), // خلفية شفافة على الخريطة
+              child: MockOffersScreen(
+                onClose: () => setState(() => showDriversOverlay = false),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

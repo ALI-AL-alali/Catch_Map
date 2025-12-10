@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:map/screen/driver_screen.dart';
+import 'package:map/screen/map_page.dart';
 import 'map_screen.dart';
 
 class UserSelectionScreen extends StatefulWidget {
@@ -16,6 +17,10 @@ class _UserSelectionScreenState extends State<UserSelectionScreen>
 
   final List<String> customers = ["زينة", "رزان", "محمد"];
   final List<String> drivers = ["فداء", "علي", "جمال"];
+
+  String? selectedMapScreen; // ⬅ هنا لتحديد أي شاشة خريطة
+
+  final List<String> mapScreens = ["MapScreen", "MapPage"]; // ⬅ الخيارات
 
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
@@ -45,7 +50,39 @@ class _UserSelectionScreenState extends State<UserSelectionScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white, // خلفية بيضاء
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text("اختيار المستخدم"),
+        backgroundColor: const Color(0xff6a11cb),
+        actions: [
+          // زر اختيار الشاشة
+          DropdownButton<String>(
+            value: selectedMapScreen,
+            hint: const Text(
+              "اختر الخريطة",
+              style: TextStyle(color: Colors.white),
+            ),
+            dropdownColor: Colors.purple,
+            iconEnabledColor: Colors.white,
+            underline: const SizedBox(),
+            items: mapScreens.map((screen) {
+              return DropdownMenuItem(
+                value: screen,
+                child: Text(
+                  screen,
+                  style: const TextStyle(color: Colors.white),
+                ),
+              );
+            }).toList(),
+            onChanged: (val) {
+              setState(() {
+                selectedMapScreen = val;
+              });
+            },
+          ),
+          const SizedBox(width: 10),
+        ],
+      ),
       body: FadeTransition(
         opacity: _fadeAnimation,
         child: Center(
@@ -57,10 +94,10 @@ class _UserSelectionScreenState extends State<UserSelectionScreen>
               margin: const EdgeInsets.symmetric(horizontal: 20),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(30), // الحواف
+                borderRadius: BorderRadius.circular(30),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.2), // ظل خفيف
+                    color: Colors.black.withOpacity(0.2),
                     blurRadius: 20,
                     offset: const Offset(0, 10),
                   ),
@@ -161,25 +198,25 @@ class _UserSelectionScreenState extends State<UserSelectionScreen>
                         shadowColor: Colors.purpleAccent,
                         elevation: 8,
                       ),
-                      onPressed: selectedName == null
+                      onPressed:
+                          (selectedName == null || selectedMapScreen == null)
                           ? null
                           : () {
+                              Widget nextScreen;
                               if (selectedType == "زبون") {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => MapScreen(),
-                                  ),
-                                );
+                                nextScreen = selectedMapScreen == "MapScreen"
+                                    ? MapScreen()
+                                    : const MapPage();
                               } else {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        DriverScreen(driverName: selectedName!),
-                                  ),
+                                nextScreen = DriverScreen(
+                                  driverName: selectedName!,
                                 );
                               }
+
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => nextScreen),
+                              );
                             },
                       child: const Text(
                         "دخول",
