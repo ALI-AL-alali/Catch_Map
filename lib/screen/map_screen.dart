@@ -236,97 +236,203 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     // }
   }
 
-  void _showPriceAdjustmentSheet() {
-    int price = serverResult?.calculated_price ?? 20000;
+ void _showPriceAdjustmentSheet() {
+  int price = serverResult?.calculated_price ?? 20000;
 
-    showModalBottomSheet(
-      context: context,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      isScrollControlled: true,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setStateSheet) {
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
-                left: 16,
-                right: 16,
-                top: 16,
+ 
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (context) {
+      return Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+          left: 16,
+          right: 16,
+          top: 16,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            
+           
+            /// Row التحكم بالسعر
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton(
+                  onPressed: () {
+                    price = (price - 1000).clamp(0, double.infinity).toInt();
+                  },
+                  icon: const Icon(Icons.remove_circle, color: Colors.red, size: 36),
+                ),
+                const SizedBox(width: 20),
+                Text(
+                  "$price ل.س",
+                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(width: 20),
+                IconButton(
+                  onPressed: () {
+                    price += 1000;
+                  },
+                  icon: const Icon(Icons.add_circle, color: Colors.green, size: 36),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 24),
+
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _showDriverSearchSheet();
+              },
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 50),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    "ضبط السعر قبل جلب السائقين",
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+              child: const Text("جلب السائقين"),
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      );
+    },
+  );
+}
+
+void _showDriverSearchSheet() {
+   List<Map<String, dynamic>> drivers = [
+    {"name": "driver1", "image": "https://i.pravatar.cc/150?img=1"},
+    {"name": "driver2", "image": "https://i.pravatar.cc/150?img=2"},
+    {"name": "driver3", "image": "https://i.pravatar.cc/150?img=14"},
+    {"name": "driver4", "image": "https://i.pravatar.cc/150?img=4"},
+    {"name": "driver5", "image": "https://i.pravatar.cc/150?img=5"},
+  ];
+
+  int currentCount = drivers.length; // ← كلهم يطلعوا مرة وحدة
+  List<Map<String, dynamic>> displayList =
+      drivers.length > 3 ? drivers.sublist(0, 3) : drivers;
+
+  showModalBottomSheet(
+    context: context,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)), // زوايا أكبر
+    ),
+    isScrollControlled: true,
+    backgroundColor: Colors.white,
+    builder: (context) {
+      return Padding(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 20,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+ Container(
+              width: 50,
+              height: 5,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+
+             const SizedBox(height: 16),
+
+            /// صور السائقين + عددهم
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  "عدد السائقين: $currentCount",
+                  style: const TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                SizedBox(
+                  height: 40,
+                  width: 120,
+                  child: Stack(
                     children: [
-                      IconButton(
-                        onPressed: () {
-                          setStateSheet(() {
-                            price = (price - 1000)
-                                .clamp(0, double.infinity)
-                                .toInt();
-                          });
-                        },
-                        icon: Icon(
-                          Icons.remove_circle,
-                          color: Colors.red,
-                          size: 36,
+                      for (int i = 0; i < (currentCount > 3 ? 3 : currentCount); i++)
+                        Positioned(
+                          left: i * 28,
+                          child: CircleAvatar(
+                            radius: 18,
+                            backgroundImage: NetworkImage(displayList[i]["image"]!),
+                          ),
                         ),
-                      ),
-                      SizedBox(width: 20),
-                      Text(
-                        "$price ل.س",
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
+                      if (currentCount > 3)
+                        Positioned(
+                          left: 3 * 28,
+                          child: CircleAvatar(
+                            radius: 18,
+                            backgroundColor: Colors.grey.shade300,
+                            child: Text(
+                              "+${currentCount - 3}",
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ),
                         ),
-                      ),
-                      SizedBox(width: 20),
-                      IconButton(
-                        onPressed: () {
-                          setStateSheet(() {
-                            price += 1000;
-                          });
-                        },
-                        icon: Icon(
-                          Icons.add_circle,
-                          color: Colors.green,
-                          size: 36,
-                        ),
-                      ),
                     ],
                   ),
-                  SizedBox(height: 24),
-                  ElevatedButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      // فتح واجهة السائقين كما هي بدون أي تعديل
-                      setState(() => showDriversOverlay = true);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: Size(double.infinity, 50),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: Text("جلب السائقين"),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 16),
+
+           
+
+        
+            const SizedBox(height: 15),
+
+            const Text(
+              "اضغط على الزر لبدء البحث عن أقرب السائقين المتاحين.",
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16, color: Colors.black54),
+            ),
+            const SizedBox(height: 25),
+
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context); // اغلاق البوتم شيت
+                  setState(() => showDriversOverlay = true); // عرض الـ overlay
+                },
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  backgroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  SizedBox(height: 16),
-                ],
+                  elevation: 4,
+                  shadowColor: Colors.black26,
+                ),
+                child: const Text(
+                  "بحث عن السائقين",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
               ),
-            );
-          },
-        );
-      },
-    );
-  }
+            ),
+
+            const SizedBox(height: 15),
+          ],
+        ),
+      );
+    },
+  );
+}
 
   // void _showDriversSheet() {
   //   showModalBottomSheet(
