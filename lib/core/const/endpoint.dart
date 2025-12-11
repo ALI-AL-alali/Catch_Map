@@ -3,4 +3,5 @@ class EndPoint {
       "https://tableghat.com/catch/DistanceCalculator/public";
 
   static const String distance = "$baseUrl/distance-result";
+  static const String login = "$baseUrl/auth/login";
 }

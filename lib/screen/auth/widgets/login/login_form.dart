@@ -1,5 +1,8 @@
+// ignore_for_file: use_build_context_synchronously
 import 'package:flutter/material.dart';
+import 'package:map/core/helpers/app_routes.dart';
 import 'package:map/core/helpers/validators.dart';
+import 'package:map/services/auth_api.dart';
 import 'package:map/widgets/custom_input.dart';
 
 class LoginForm extends StatefulWidget {
@@ -14,6 +17,34 @@ class _LoginFormState extends State<LoginForm> {
   final password = TextEditingController();
   final formKey = GlobalKey<FormState>();
   bool isLoading = false;
+
+  Future<void> login() async {
+    if (formKey.currentState!.validate()) {
+      setState(() => isLoading = true);
+
+      try {
+        final user = await AuthApi.login(email.text, password.text);
+
+        if (user.userType == "customer") {
+          Navigator.pushReplacementNamed(context, AppRoutes.mapScreen);
+
+        } else if (user.userType == "driver") {
+          Navigator.pushReplacementNamed(context, AppRoutes.driverScreen);
+
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("ليس لديك صلاحية بالدخول")),
+          );
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString())),
+        );
+      } finally {
+        setState(() => isLoading = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -72,16 +103,8 @@ class _LoginFormState extends State<LoginForm> {
                       obscureText: true,
                     ),
                     SizedBox(height: 30),
-
-                    // زر تسجيل الدخول
                     ElevatedButton(
-                      onPressed: isLoading
-                          ? null
-                          : () {
-                              if (formKey.currentState!.validate()) {
-                                setState(() => isLoading = true);
-                              }
-                            },
+                       onPressed: isLoading ? null : login,
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         backgroundColor: Colors.blue.shade700,
