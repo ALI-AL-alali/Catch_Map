@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="@android:color/white">
+
+    <TextView
+        android:id="@+id/txtTitle"
+        android:text="Catch"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:textColor="@android:color/black"/>
+
+    <TextView
+        android:id="@+id/txtEta"
+        android:text="ETA 10 min"
+        android:textColor="@android:color/darker_gray"/>
+
+    <TextView
+        android:id="@+id/txtPlate"
+        android:text="Plate 123456"
+        android:textStyle="bold"
+        android:textColor="@android:color/black"/>
+
+    <ProgressBar
+        android:id="@+id/progressRide"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="10dp"
+        android:max="100"
+        android:progress="50"
+        android:progressDrawable="@android:drawable/progress_horizontal"
+        android:layout_marginTop="12dp"/>
+
+</LinearLayout>

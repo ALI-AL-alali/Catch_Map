@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:map/core/utils/widget_to_image.dart';
 import 'package:map/screen/driver_screen.dart';
 import 'package:map/screen/map_page.dart';
+import 'package:map/services/notifications_service.dart';
+import 'package:map/widgets/ride_progress_card.dart';
 import 'map_screen.dart';
 
 class UserSelectionScreen extends StatefulWidget {
@@ -18,9 +21,8 @@ class _UserSelectionScreenState extends State<UserSelectionScreen>
   final List<String> customers = ["زينة", "رزان", "محمد"];
   final List<String> drivers = ["فداء", "علي", "جمال"];
 
-  String? selectedMapScreen; // ⬅ هنا لتحديد أي شاشة خريطة
-
-  final List<String> mapScreens = ["MapScreen", "MapPage"]; // ⬅ الخيارات
+  String? selectedMapScreen;
+  final List<String> mapScreens = ["MapScreen", "MapPage"];
 
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
@@ -29,6 +31,7 @@ class _UserSelectionScreenState extends State<UserSelectionScreen>
   void initState() {
     super.initState();
 
+    // إعداد الرسوم المتحركة
     _fadeController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 1),
@@ -37,8 +40,29 @@ class _UserSelectionScreenState extends State<UserSelectionScreen>
       begin: 0,
       end: 1,
     ).animate(CurvedAnimation(parent: _fadeController, curve: Curves.easeIn));
-
     _fadeController.forward();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await NativeNotifications.showRideNotification(
+        price: '25000',
+        progress: 0,
+      );
+    });
+    // // إضافة الكود الخاص بالإشعارات بعد بناء الواجهة
+    // WidgetsBinding.instance.addPostFrameCallback((_) async {
+    //   final widgetToImage = WidgetToImage();
+    //   final bytes = await widgetToImage.captureWidget(
+    //     RideProgressCard(
+    //       eta: "10 min",
+    //       price: "250000",
+    //       plate: "123456",
+    //       progress: 0.5,
+    //     ),
+    //   );
+
+    //   if (bytes != null) {
+    //     await showRideNotification(bytes);
+    //   }
+    // });
   }
 
   @override
@@ -55,7 +79,6 @@ class _UserSelectionScreenState extends State<UserSelectionScreen>
         title: const Text("اختيار المستخدم"),
         backgroundColor: const Color(0xff6a11cb),
         actions: [
-          // زر اختيار الشاشة
           DropdownButton<String>(
             value: selectedMapScreen,
             hint: const Text(

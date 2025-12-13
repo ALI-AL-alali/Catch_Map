@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:map/core/helpers/app_routes.dart';
-
-// import 'package:map/screen/map_screen.dart';
 import 'package:map/screen/user_selection_screen.dart';
+import 'services/notifications_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  // await initNotifications();
   runApp(const MyApp());
 }
 
@@ -15,13 +15,9 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-      ),
+      title: 'Catch Bidding',
+      theme: ThemeData(primarySwatch: Colors.green),
       home: const UserSelectionScreen(),
-      // initialRoute: AppRoutes.login,
-      // routes: AppRoutes.routes,
     );
   }
 }

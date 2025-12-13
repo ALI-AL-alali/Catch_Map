@@ -32,6 +32,7 @@ class DistanceApiService {
       final data = jsonDecode(res.body);
       return DistanceResult.fromJson(data);
     } catch (e) {
+      print("ERROR BODY: ${e.toString()}");
       return null;
     }
   }
