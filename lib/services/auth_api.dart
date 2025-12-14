@@ -35,6 +35,9 @@ class AuthApi {
         await Cachenetwork.insert("user_type", user.userType);
         await Cachenetwork.insert("user_id", user.userId.toString());
 
+        token=Cachenetwork.getdata("token");
+        print(token);
+
         return user;
       } else {
         return null;
