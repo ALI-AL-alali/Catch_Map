@@ -18,7 +18,7 @@ class Validators {
   /// ✅ يتحقق من كلمة المرور
   static String? password(
     String? value, {
-    int minLength = 8,
+    int minLength = 6,
     bool requireUpperCase = false,
     bool requireNumber = false,
     bool requireSpecialChar = false,

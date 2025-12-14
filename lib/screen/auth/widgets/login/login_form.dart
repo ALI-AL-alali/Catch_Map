@@ -2,6 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:map/core/helpers/app_routes.dart';
 import 'package:map/core/helpers/validators.dart';
+import 'package:map/screen/driver_screen.dart';
+import 'package:map/screen/map_screen.dart';
 import 'package:map/services/auth_api.dart';
 import 'package:map/widgets/custom_input.dart';
 
@@ -23,23 +25,34 @@ class _LoginFormState extends State<LoginForm> {
       setState(() => isLoading = true);
 
       try {
-        final user = await AuthApi.login(email.text, password.text);
+        final user = await AuthApi.login(
+          email.text.trim(),
+          password.text.trim(),
+        );
 
-        if (user.userType == "customer") {
-          Navigator.pushReplacementNamed(context, AppRoutes.mapScreen);
-
-        } else if (user.userType == "driver") {
-          Navigator.pushReplacementNamed(context, AppRoutes.driverScreen);
-
+        if (user?.userType == "customer") {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const MapScreen()),
+          );
+        } else if (user?.userType == "driver") {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => DriverScreen(driverName: user!.name),
+            ),
+          );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("ليس لديك صلاحية بالدخول")),
+            const SnackBar(
+              content: Text("البريد الإلكتروني أو كلمة المرور غير صحيحة"),
+            ),
           );
         }
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.toString())));
       } finally {
         setState(() => isLoading = false);
       }
@@ -104,7 +117,7 @@ class _LoginFormState extends State<LoginForm> {
                     ),
                     SizedBox(height: 30),
                     ElevatedButton(
-                       onPressed: isLoading ? null : login,
+                      onPressed: isLoading ? null : login,
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         backgroundColor: Colors.blue.shade700,
@@ -126,6 +139,7 @@ class _LoginFormState extends State<LoginForm> {
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
+                                color: Colors.white,
                               ),
                             ),
                     ),

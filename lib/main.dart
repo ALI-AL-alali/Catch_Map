@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:map/screen/user_selection_screen.dart';
-import 'services/notifications_service.dart';
+import 'package:map/core/utils/cachenetwork.dart';
+import 'package:map/screen/auth/login_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // await initNotifications();
+  await Cachenetwork.init();
   runApp(const MyApp());
 }
 
@@ -17,7 +17,7 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Catch Bidding',
       theme: ThemeData(primarySwatch: Colors.green),
-      home: const UserSelectionScreen(),
+      home: const LoginScreen(),
     );
   }
 }

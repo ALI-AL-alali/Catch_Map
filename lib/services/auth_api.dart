@@ -1,28 +1,47 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
-import '../models/user.dart';
-import 'package:map/core/const/endpoint.dart';
 
+import 'package:http/http.dart' as http;
+import 'package:map/core/const/endpoint.dart';
+import 'package:map/core/utils/cachenetwork.dart';
+import 'package:map/models/user.dart';
 
 class AuthApi {
-  static Future<User> login(String email, String password) async {
-    final response = await http.post(
-      Uri.parse(EndPoint.login),
-      headers: {
-        "Accept": "application/json",
-      },
-      body: {
-        "email": email,
-        "password": password,
-      },
-    );
+  static Future<User?> login(String email, String password) async {
+    try {
+      final response = await http.post(
+        Uri.parse(EndPoint.login),
+        headers: {
+          "Accept": "application/json",
+          "Content-Type": "application/json",
+        },
+        body: jsonEncode({"email": email, "password": password}),
+      );
 
-    final data = jsonDecode(response.body);
+      final json = jsonDecode(response.body);
 
-    if (response.statusCode == 200) {
-      return User.fromJson(data);
-    } else {
-      throw Exception(data["message"] ?? "حدث خطأ أثناء تسجيل الدخول");
+      print("STATUS CODE: ${response.statusCode}");
+      print("RESPONSE BODY: ${response.body}");
+
+      if (response.statusCode == 200 && json["success"] == true) {
+        final data = json["data"];
+        final user = User(
+          userId: data["user"]["id"],
+          userType: data["user"]["role"],
+          token: data["token"],
+          name: data["user"]["name"],
+        );
+
+        await Cachenetwork.insert("token", user.token);
+        await Cachenetwork.insert("user_type", user.userType);
+        await Cachenetwork.insert("user_id", user.userId.toString());
+
+        return user;
+      } else {
+        return null;
+      }
+    } catch (e) {
+      print("خطأ اتصال: $e");
+      return null;
     }
   }
 }

@@ -1,7 +1,8 @@
 class EndPoint {
   static const String baseUrl =
       "https://tableghat.com/catch/DistanceCalculator/public";
+  static const String baseUrl2 = 'http://192.168.100.47:8000/api';
 
   static const String distance = "$baseUrl/distance-result";
-  static const String login = "$baseUrl/auth/login";
+  static const String login = "$baseUrl2/auth/login";
 }
