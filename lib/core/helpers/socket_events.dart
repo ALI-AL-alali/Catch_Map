@@ -1,77 +1,158 @@
 import 'package:flutter/foundation.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:map/core/const/endpoint.dart';
 
+import '../../models/driver_available_model.dart';
 import '../../services/io_socket_services.dart';
 
+
+import 'package:geolocator/geolocator.dart';
+
 class SocketEvents {
-  late final SocketService _socketService;
-  // Private method to handle socket events
+  final SocketService _socketService;
+
+  // Initialize it in the constructor
+  SocketEvents() : _socketService = SocketService();
 
   var currentState = 'online';
-  void updateState(String newState) {
-    currentState = newState;
+
+  Future<void> openSocketConnection(final String event, final String status) async {
+    try {
+      await _socketService.connect('${EndPoint.socketUrl}', event, status);
+      debugPrint('🔌 Socket connected to ${EndPoint.socketUrl}');
+
+      // Send event only if the connection is successful
+      if (_socketService.isConnected()) {
+        _socketService.send(event, {'status': status});
+      } else {
+        debugPrint('Socket is not connected. Unable to send data.');
+      }
+
+      startListeningToSocketEvents(event, status);
+    } catch (e, stackTrace) {
+      debugPrint('❌ openSocketConnection error: $e');
+      debugPrint('📌 StackTrace: $stackTrace');
+      rethrow;
+    }
   }
 
-  Future<void> openSocketConnection() async {
+  Future<void> openSocketCustomerConnection() async {
     await _socketService.connect(
-      // ServerConfig.baseUrl + ServerConfig.socketTrackingUri
-      '',
+      EndPoint.socketUrl,
+      'bid:placed',
+      'placed',
+      onConnected: () {
+        // 👈 الآن الاتصال جاهز 100%
+        _socketService.send('bid:placed', {'status': 'placed'});
+
+      },
     );
 
-    // Listen to socket events
-    await Future.delayed(
-      const Duration(milliseconds: 500),
-    ); // Allow time for initialization
-    startListeningToSocketEvents();
+    listenToAvailableDrivers();
   }
 
-  void startListeningToSocketEvents() {
-    // final MapController mapController = Get.find();
 
-    _socketService.on('trip_request', (data) {
-      debugPrint('the driverHaveRequest data: $data');
-      final tripData = data['trip'];
-      // updateState('trip_request');
-      // currentTrip.value = Trip.fromJson(tripData);
-      // showNewOrder();
-      // animationController.forward();
-
-      // shiftController.showNewOrder();
-
-      // final AcceptTripRequestModel trip = AcceptTripRequestModel.fromJson(data);
-      // updateMapStage(moveAhead: true);
-      // tripId = trip.id;
-      // if (trip.driver != null) {
-      //   driverSocketInfoModel = trip.driver!;
-      //   debugPrint('Driver Name: ${trip.driver?.name}');
-      //   debugPrint('Driver Phone: ${trip.driver?.phoneNumber}');
-      //   addDriverMarkerWhenFindOne(mapController);
-      // }
-      // if (trip.shift != null) {
-      //   shiftInfoModel = trip.shift!;
-      //   debugPrint(
-      //       'Driver vehicle number: ${trip.shift?.vehicle?.vehicleNumber}');
-      //   debugPrint('Driver vehicle model: ${trip.shift?.vehicle?.model}');
-      // }
-    });
-    _socketService.on('driverArrivedToPickup', (data) {
-      debugPrint('the driverArrivedToPickup data: $data');
-      // updateState('driverArrivedToPickup');
-    });
-    // _socketService.on('driverStartTransit', (data) {
-    //   debugPrint('the driverStartTransit data: $data');
-    //
-    //   updateState('eta');
-    // });
-    _socketService.on('driverCompleteTrip', (data) {
-      // tripMetricsResponse = TripMetricsResponse.fromJson(data);
-      // debugPrint('the driverCompleteTrip data: $data');
-      // updateState('driverCompleteTrip');
-      // shiftController.endTrip();
+  // Start listening to events
+  void startListeningToSocketEvents(String eventName, String status) {
+    _socketService.on(eventName, (data) {
+      debugPrint('$eventName: $data');
+      // Send additional data if necessary
+      _socketService.send(eventName, {'status': status});
     });
   }
 
-  // Close the socket connection
+  // Add this method to handle location updates
+  void listenToLocationUpdates() {
+    // Request location permission first
+    _checkLocationPermission();
+
+    // Start listening to the location stream
+    Geolocator.getPositionStream(
+      locationSettings: LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 5,  // Updates when location changes by 5 meters
+        timeLimit: Duration(seconds: 20),  // Interval between updates
+      ),
+    ).listen((Position position) {
+      // Handle location updates
+      _socketService.send('driver:location:update', {
+        'lat': position.latitude,
+        'lng': position.longitude,
+        'ride_id': 'currentRideId',  // Pass the ride ID dynamically
+        'heading': position.heading,
+        'speed': position.speed
+      });
+      debugPrint('Location updated: ${position.latitude}, ${position.longitude}');
+    });
+  }
+
+  // Check for location permissions
+  Future<void> _checkLocationPermission() async {
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      debugPrint('Location permission denied forever');
+    }
+  }
+
   void closeSocketConnection() {
     _socketService.disconnect();
   }
+
+  void sendCustomerPickupLocation({
+    required double pickupLat,
+    required double pickupLng,
+  }) {
+    if (!_socketService.isConnected()) {
+      debugPrint('❌ Socket not connected');
+      return;
+    }
+
+    debugPrint('📤 Sending pickup location');
+
+    _socketService.send(
+      'customer:availableDrivers',
+      {
+        'pickup_lat': pickupLat,
+        'pickup_lng': pickupLng,
+      },
+    );
+  }
+
+
+  void listenToAvailableDrivers() {
+    _socketService.on(
+      'availableDrivers:response',
+          (data) {
+        debugPrint('📥 Available drivers response: $data');
+
+        final response = AvailableDriversResponse.fromJson(data);
+
+        if (response.success) {
+          debugPrint('✅ ${response.meta.totalFound} drivers found');
+
+          for (final item in response.data) {
+            debugPrint(
+              '🚗 ${item.driver.name} | '
+                  '${item.distanceKm} km | '
+                  'ETA: ${item.estimatedArrival}',
+            );
+          }
+        } else {
+          debugPrint('❌ ${response.message}');
+        }
+      },
+    );
+  }
+
+
+
+
+
 }
+
+
+

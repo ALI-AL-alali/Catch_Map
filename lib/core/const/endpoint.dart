@@ -2,6 +2,7 @@ class EndPoint {
   static const String baseUrl =
       "https://tableghat.com/catch/DistanceCalculator/public";
   static const String baseUrl2 = 'http://192.168.100.47:8000/api';
+  static const String socketUrl = 'ws://192.168.100.47:4000';
 
 
 

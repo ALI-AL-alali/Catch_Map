@@ -7,6 +7,8 @@ import 'package:map/screen/map_screen.dart';
 import 'package:map/services/auth_api.dart';
 import 'package:map/widgets/custom_input.dart';
 
+import '../../../../core/helpers/socket_events.dart';
+
 class LoginForm extends StatefulWidget {
   const LoginForm({super.key});
 
@@ -31,12 +33,16 @@ class _LoginFormState extends State<LoginForm> {
         );
 
         if (user?.userType == "customer") {
-          Navigator.pushReplacement(
+
+          await Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (_) => const MapScreen()),
           );
         } else if (user?.userType == "driver") {
-          Navigator.pushReplacement(
+          final SocketEvents socketEvents = SocketEvents();
+          socketEvents.openSocketConnection('driver:online','online');
+          socketEvents.listenToLocationUpdates();
+          await Navigator.pushReplacement(
             context,
             MaterialPageRoute(
               builder: (_) => DriverScreen(driverName: user!.name),

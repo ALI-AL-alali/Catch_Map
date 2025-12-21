@@ -1,5 +1,9 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:map/core/const/endpoint.dart';
+import 'package:map/core/helpers/socket_events.dart';
 import 'package:map/services/get_driver.dart';
 import 'dart:async';
 import '../../services/graphhopper_service.dart';
@@ -11,6 +15,7 @@ import '../widgets/route_card.dart';
 import 'package:geolocator/geolocator.dart';
 
 import 'get_driver_screen.dart'; // إضافة مكتبة geolocator
+import 'package:http/http.dart' as http;
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -29,7 +34,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   List<LatLng> animatedRoute = [];
 
   LatLng? startPoint;
-  LatLng? endPoint;
+ LatLng? endPoint;
 
   DistanceResult? serverResult;
 
@@ -38,6 +43,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
   final graphhopper = GraphHopperService();
   final apiService = DistanceApiService();
+  final SocketEvents socketEvents = SocketEvents();
 
   static const CameraPosition _initialPosition = CameraPosition(
     target: LatLng(33.5138, 36.2765),
@@ -78,6 +84,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
     _getCurrentLocation();
     _addDriverMarkers(); // إضافة الماركرات الخاصة بالسيارات
+
   }
 
   // إضافة الماركرات الخاصة بالسيارات المتواجدة
@@ -218,9 +225,10 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     if (result != null) setState(() => serverResult = result);
   }
 
-  void _confirmTrip() {
+  void _confirmTrip() async{
     if (startPoint != null && endPoint != null) {
-      _showPriceAdjustmentSheet(); // هنا بنفتح البوتم شي
+      await _showPriceAdjustmentSheet(); // هنا بنفتح البوتم شي
+
     } else {
       ScaffoldMessenger.of(
         context,
@@ -239,7 +247,11 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     // }
   }
 
-  void _showPriceAdjustmentSheet() {
+
+
+
+
+   _showPriceAdjustmentSheet() {
     int price = serverResult?.calculated_price ?? 20000;
 
     showModalBottomSheet(
@@ -303,10 +315,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                           estimatedDuration: 2500,
                           estimatedPrice: price.toDouble(),
                         );
-
+                        await socketEvents.openSocketCustomerConnection();
                         // جلب السائقين من الباك
                         final driversResponse = await fetchDrivers();
                         final List<DriverData> drivers = driversResponse?.data ?? [];
+
+
 
                         Navigator.pop(context); // اغلاق البوتم شيت
                         _showDriverSearchSheet(price: price, drivers: drivers);
@@ -411,8 +425,11 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
+                  onPressed: () async{
+
+                    socketEvents.sendCustomerPickupLocation(pickupLat: startPoint!.latitude, pickupLng: startPoint!.longitude);
+                    // socketEvents.listenToAvailableDrivers();
+                     Navigator.pop(context);
                     setState(() => showDriversOverlay = true);
                   },
                   style: ElevatedButton.styleFrom(
