@@ -1,9 +1,17 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:map/core/const/endpoint.dart';
+import 'package:map/services/create_ride_api.dart';
+
+import '../core/helpers/socket_events.dart';
+import '../models/driver_available_model.dart';
 
 // ---------------- DriverItem ----------------
 class DriverItem {
-  final String driverEmail;
+  final int driverId;
+  final String driverName;
   final int basePrice;
   int? driverPrice;
   final String status;
@@ -17,13 +25,14 @@ class DriverItem {
 
   VoidCallback? onRemoveWithAnimation;
 
+
   DriverItem({
-    required this.driverEmail,
+    required this.driverId,
+    required this.driverName,
     required this.basePrice,
     required this.status,
     this.driverPrice,
-    this.driverMockName = "سائق متاح",
-    this.driverMockImageUrl = "https://i.pravatar.cc/150?img=1",
+    this.driverMockImageUrl = "https://i.pravatar.cc/150?img=1", required this.driverMockName,
   });
 
   void startTimer(VoidCallback onFinish) {
@@ -75,10 +84,18 @@ class _AnimatedDriverCardState extends State<AnimatedDriverCard>
   bool isExiting = false;
 
   Timer? _uiUpdateTimer;
+  SocketEvents socketEvents = SocketEvents();
+
+
+
+
+
+
 
   @override
   void initState() {
     super.initState();
+
 
     _uiUpdateTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
       if (mounted) setState(() {});
@@ -202,6 +219,8 @@ class _AnimatedDriverCardState extends State<AnimatedDriverCard>
     _exitController!.forward();
   }
 
+
+
   @override
   Widget build(BuildContext context) {
     final item = widget.driverItem;
@@ -233,12 +252,13 @@ class _AnimatedDriverCardState extends State<AnimatedDriverCard>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      item.driverMockName,
+                      item.driverName,
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
+
                     Text(
                       "تقييم 4.8 ⭐",
                       style: TextStyle(
@@ -326,6 +346,19 @@ class _AnimatedDriverCardState extends State<AnimatedDriverCard>
                 ),
               ],
             ),
+
+            OutlinedButton(
+              onPressed: (){
+                socketEvents.startListeningToSocketEvents('ride:price-update', 'update');
+              },
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 48),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text("عرض مزايدة"),
+            ),
           ],
         ),
       ),
@@ -360,8 +393,9 @@ class _AnimatedDriverCardState extends State<AnimatedDriverCard>
 // ---------------- MockOffersScreen (Overlay) ----------------
 class MockOffersScreen extends StatefulWidget {
   final VoidCallback? onClose;
+  final int rideId;
 
-  const MockOffersScreen({super.key, this.onClose});
+  const MockOffersScreen({super.key, this.onClose, required this.rideId});
 
   @override
   State<MockOffersScreen> createState() => _MockOffersScreenState();
@@ -369,74 +403,170 @@ class MockOffersScreen extends StatefulWidget {
 
 class _MockOffersScreenState extends State<MockOffersScreen> {
   final List<DriverItem> activeOffers = [];
+  final SocketEvents socketEvents = SocketEvents();
 
-  final List<Map<String, dynamic>> mockDrivers = [
-    {
-      "name": "driver1",
-      "image": "https://i.pravatar.cc/150?img=4",
-      "price": 25000,
-    },
-    {
-      "name": "driver2",
-      "image": "https://i.pravatar.cc/150?img=5",
-      "price": 22000,
-    },
-    {
-      "name": "driver3",
-      "image": "https://i.pravatar.cc/150?img=7",
-      "price": 27000,
-    },
-    {
-      "name": "driver4",
-      "image": "https://i.pravatar.cc/150?img=8",
-      "price": 28000,
-    },
-    {
-      "name": "driver5",
-      "image": "https://i.pravatar.cc/150?img=9",
-      "price": 23000,
-    },
-  ];
+
+
+  Future<void> _fetchBids() async {
+    final rideServices= RideApiService();
+    try {
+      final response = await getBids(widget.rideId); // ride_id = 15
+
+      if (!mounted) return;
+
+      final List<DriverItem> items = response.data.bids.map((bid) {
+        final item = DriverItem(
+          driverId: bid.driver.id,               // 53
+          driverName: bid.driver.name,            // "32سائق تجريبي"
+          basePrice: int.parse(
+            bid.price.split('.').first,           // "888.00" → 888
+          ),
+          driverPrice: int.parse(
+            bid.price.split('.').first,
+          ),
+          status: bid.isAccepted ? "accepted" : "pending",
+          driverMockName: bid.driver.name,
+          driverMockImageUrl:
+          "https://i.pravatar.cc/150?img=${bid.driver.id}",
+        );
+
+        item.onRemoveWithAnimation = () => _removeOfferItem(item);
+
+        item.startTimer(() {
+          if (mounted) _removeOfferItem(item);
+        });
+
+        return item;
+      }).toList();
+
+
+      setState(() {
+        activeOffers
+          ..clear()
+          ..addAll(items);
+      });
+
+
+      // setState(() {
+      //   activeOffers.clear();
+      //   activeOffers.addAll(items);
+      // });
+    } catch (e) {
+      debugPrint("Error fetching bids: $e");
+    }
+  }
+
+
+  static Future<BidsResponse> getBids(int rideId) async {
+    final t = await token;
+    debugPrint('TOKEN => $t');
+
+    final response = await http.get(
+      Uri.parse("${EndPoint.getDriver}/$rideId/bids"),
+      headers: {
+        "Accept": "application/json",
+        "Authorization": "Bearer $t",
+      },
+    );
+
+    debugPrint('STATUS CODE => ${response.statusCode}');
+    debugPrint('BODY => ${response.body}');
+
+    if (response.statusCode == 200) {
+      return BidsResponse.fromJson(jsonDecode(response.body));
+    } else {
+      throw Exception("فشل تحميل العروض");
+    }
+  }
+
+
+  void _loadBidsFromSocket() {
+    socketEvents.requestRideBids(
+      rideId: widget.rideId,
+      onData: (response) {
+        if (!mounted) return;
+
+        final List bids = response['data']['bids'];
+
+        final items = bids.map<DriverItem>((bid) {
+          final item = DriverItem(
+            driverId: bid['driver']['id'],
+            driverName: bid['driver']['name'],
+            basePrice: int.parse(bid['price']),
+            driverPrice: int.parse(bid['price']),
+            status: bid['status'],
+            driverMockName: bid['driver']['name'],
+            driverMockImageUrl:
+            'https://i.pravatar.cc/150?img=${bid['driver']['id']}',
+          );
+
+          item.onRemoveWithAnimation = () => _removeOfferItem(item);
+
+          item.startTimer(() {
+            if (mounted) _removeOfferItem(item);
+          });
+
+          return item;
+        }).toList();
+
+        setState(() {
+          activeOffers
+            ..clear()
+            ..addAll(items);
+        });
+      },
+    );
+  }
+
+
+
+
 
   @override
   void initState() {
     super.initState();
-    _addMockDriversSequentially();
+    _fetchBids();
+    // _addMockDriversSequentially();
+    // _loadBidsFromSocket();
+
   }
 
-  void _addMockDriversSequentially() async {
-    for (var i = 0; i < mockDrivers.length; i++) {
-      await Future.delayed(const Duration(seconds: 2));
-      final driver = mockDrivers[i];
-      final item = DriverItem(
-        driverEmail: "driver_$i",
-        basePrice: 20000,
-        driverPrice: driver["price"],
-        status: "pending",
-        driverMockName: driver["name"],
-        driverMockImageUrl: driver["image"],
-      );
+  // void _addMockDriversSequentially() async {
+  //   for (var i = 0; i < mockDrivers.length; i++) {
+  //     await Future.delayed(const Duration(seconds: 2));
+  //     final driver = mockDrivers[i];
+  //     final item = DriverItem(
+  //       driverEmail: "driver_$i",
+  //       basePrice: 20000,
+  //       driverPrice: driver["price"],
+  //       status: "pending",
+  //       driverMockName: driver["name"],
+  //       driverMockImageUrl: driver["image"],
+  //     );
+  //
+  //     item.onRemoveWithAnimation = () => _removeOfferItem(item);
+  //
+  //     if (!mounted) return;
+  //     setState(() => activeOffers.add(item));
+  //
+  //     item.startTimer(() {
+  //       if (mounted) _removeOfferItem(item);
+  //     });
+  //   }
+  // }
 
-      item.onRemoveWithAnimation = () => _removeOfferItem(item);
-
-      if (!mounted) return;
-      setState(() => activeOffers.add(item));
-
-      item.startTimer(() {
-        if (mounted) _removeOfferItem(item);
-      });
-    }
-  }
-
-  void _removeOfferItem(DriverItem item) {
+  void _removeOfferItem(DriverItem item) async{
     item.cancelTimer();
+
     if (!mounted) return;
+     socketEvents.startListeningToSocketEvents('bid:rejected','rejected');
     setState(() => activeOffers.remove(item));
   }
 
-  void _acceptOffer(String driverEmail) {
+  void _acceptOffer(String driverEmail) async {
     if (!mounted) return;
-    ScaffoldMessenger.of(
+     socketEvents.startListeningToSocketEvents('bid:accepted','accepted');
+    await ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text("تم اختيار السائق: $driverEmail")));
     if (widget.onClose != null) widget.onClose!();
@@ -479,9 +609,9 @@ class _MockOffersScreenState extends State<MockOffersScreen> {
                         itemBuilder: (_, index) {
                           final item = activeOffers[index];
                           return AnimatedDriverCard(
-                            key: ValueKey(item.driverEmail),
+                            key: ValueKey(item.driverId),
                             driverItem: item,
-                            onAccept: () => _acceptOffer(item.driverEmail),
+                            onAccept: () => _acceptOffer(item.driverId.toString()),
                             onReject: () => item.onRemoveWithAnimation?.call(),
                           );
                         },

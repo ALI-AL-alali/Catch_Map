@@ -1,123 +1,122 @@
-class AvailableDriversResponse {
+class BidsResponse {
   final bool success;
-  final String message;
-  final Meta meta;
-  final List<DriverItem> data;
+  final BidsData data;
 
-  AvailableDriversResponse({
+  BidsResponse({
     required this.success,
-    required this.message,
-    required this.meta,
     required this.data,
   });
 
-  factory AvailableDriversResponse.fromJson(Map<String, dynamic> json) {
-    return AvailableDriversResponse(
+  factory BidsResponse.fromJson(Map<String, dynamic> json) {
+    return BidsResponse(
       success: json['success'],
-      message: json['message'],
-      meta: Meta.fromJson(json['meta']),
-      data: (json['data'] as List)
-          .map((e) => DriverItem.fromJson(e))
+      data: BidsData.fromJson(json['data']),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'success': success,
+      'data': data.toJson(),
+    };
+  }
+}
+class BidsData {
+  final String rideId;
+  final List<Bid> bids;
+  final int count;
+
+  BidsData({
+    required this.rideId,
+    required this.bids,
+    required this.count,
+  });
+
+  factory BidsData.fromJson(Map<String, dynamic> json) {
+    return BidsData(
+      rideId: json['ride_id'].toString(),
+      bids: (json['bids'] as List)
+          .map((e) => Bid.fromJson(e))
           .toList(),
+      count: json['count'],
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'ride_id': rideId,
+      'bids': bids.map((e) => e.toJson()).toList(),
+      'count': count,
+    };
   }
 }
 
-class Meta {
-  final int radiusKm;
-  final int limit;
-  final int totalFound;
-
-  Meta({
-    required this.radiusKm,
-    required this.limit,
-    required this.totalFound,
-  });
-
-  factory Meta.fromJson(Map<String, dynamic> json) {
-    return Meta(
-      radiusKm: json['radius_km'],
-      limit: json['limit'],
-      totalFound: json['total_found'],
-    );
-  }
-}
-class DriverItem {
+class Bid {
+  final int id;
+  final int rideId;
+  final String price;
+  final bool isAccepted;
+  final String createdAt;
   final Driver driver;
-  final double distanceKm;
-  final String estimatedArrival;
+  final dynamic customer;
 
-  DriverItem({
+  Bid({
+    required this.id,
+    required this.rideId,
+    required this.price,
+    required this.isAccepted,
+    required this.createdAt,
     required this.driver,
-    required this.distanceKm,
-    required this.estimatedArrival,
+    this.customer,
   });
 
-  factory DriverItem.fromJson(Map<String, dynamic> json) {
-    return DriverItem(
+  factory Bid.fromJson(Map<String, dynamic> json) {
+    return Bid(
+      id: json['id'],
+      rideId: json['ride_id'],
+      price: json['price'],
+      isAccepted: json['is_accepted'],
+      createdAt: json['created_at'],
       driver: Driver.fromJson(json['driver']),
-      distanceKm: (json['distance_km'] as num).toDouble(),
-      estimatedArrival: json['estimated_arrival'],
+      customer: json['customer'],
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'ride_id': rideId,
+      'price': price,
+      'is_accepted': isAccepted,
+      'created_at': createdAt,
+      'driver': driver.toJson(),
+      'customer': customer,
+    };
+  }
 }
+
 class Driver {
   final int id;
-  final int userId;
   final String name;
-  final String phone;
-  final String vehicleType;
-  final String vehiclePlate;
-  final DriverLocation location;
-  final bool hasLocation;
-  final String status;
 
   Driver({
     required this.id,
-    required this.userId,
     required this.name,
-    required this.phone,
-    required this.vehicleType,
-    required this.vehiclePlate,
-    required this.location,
-    required this.hasLocation,
-    required this.status,
   });
 
   factory Driver.fromJson(Map<String, dynamic> json) {
     return Driver(
       id: json['id'],
-      userId: json['user_id'],
       name: json['name'],
-      phone: json['phone'],
-      vehicleType: json['vehicle_type'],
-      vehiclePlate: json['vehicle_plate'],
-      location: DriverLocation.fromJson(json['location']),
-      hasLocation: json['has_location'],
-      status: json['status'],
     );
   }
-}
 
-class DriverLocation {
-  final double lat;
-  final double lng;
-  final DateTime updatedAt;
-
-  DriverLocation({
-    required this.lat,
-    required this.lng,
-    required this.updatedAt,
-  });
-
-  factory DriverLocation.fromJson(Map<String, dynamic> json) {
-    return DriverLocation(
-      lat: (json['lat'] as num).toDouble(),
-      lng: (json['lng'] as num).toDouble(),
-      updatedAt: DateTime.parse(json['updated_at']),
-    );
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+    };
   }
 }
-
 
 

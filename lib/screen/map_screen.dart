@@ -66,6 +66,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     LatLng(33.5125, 36.2750),
     LatLng(33.5160, 36.2780),
   ];
+  int? currentRideId;
 
   @override
   void initState() {
@@ -308,13 +309,17 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                     onPressed: () async {
                       try {
                         // إنشاء الرحلة
-                        await RideApiService().createRide(
+                        final rideServices = RideApiService();
+                        final response = await rideServices.createRide(
                           startAddress: "المزة",
                           endAddress: "الميدان",
                           distance: 25.2,
                           estimatedDuration: 2500,
                           estimatedPrice: price.toDouble(),
                         );
+
+                        currentRideId = response.data.rideId;
+
                         await socketEvents.openSocketCustomerConnection();
                         // جلب السائقين من الباك
                         final driversResponse = await fetchDrivers();
@@ -525,6 +530,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
             child: Container(
               color: Colors.black.withOpacity(0.5), // خلفية شفافة على الخريطة
               child: MockOffersScreen(
+                rideId: currentRideId!,
                 onClose: () => setState(() => showDriversOverlay = false),
               ),
             ),

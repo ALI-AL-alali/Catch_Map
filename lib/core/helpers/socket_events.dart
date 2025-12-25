@@ -39,16 +39,45 @@ class SocketEvents {
   Future<void> openSocketCustomerConnection() async {
     await _socketService.connect(
       EndPoint.socketUrl,
-      'bid:placed',
-      'placed',
+      'ride:price-updated',
+      'updated',
       onConnected: () {
         // 👈 الآن الاتصال جاهز 100%
-        _socketService.send('bid:placed', {'status': 'placed'});
+        _socketService.send('ride:price-updated', {'status': 'updated'});
 
       },
     );
 
-    listenToAvailableDrivers();
+    // listenToAvailableDrivers();
+  }
+
+
+  void requestRideBids({
+    required int rideId,
+    required Function(dynamic data) onData,
+  }) async {
+    // تأكد إنو السوكت متصل
+    if (!_socketService.isConnected()) {
+      await _socketService.connect(
+        EndPoint.socketUrl,
+        'ride:bids:viewed',
+        'viewed',
+      );
+    }
+
+    // استمع للريسبونس
+    _socketService.on('ride:bids:viewed', (data) {
+      debugPrint('📥 ride:bids:viewed response: $data');
+      onData(data);
+    });
+
+    // ابعت الطلب
+    _socketService.send(
+      'ride:bids:viewed',
+      {
+        'rideId': rideId,
+      },
+    );
   }
 
 
@@ -123,30 +152,30 @@ class SocketEvents {
   }
 
 
-  void listenToAvailableDrivers() {
-    _socketService.on(
-      'availableDrivers:response',
-          (data) {
-        debugPrint('📥 Available drivers response: $data');
-
-        final response = AvailableDriversResponse.fromJson(data);
-
-        if (response.success) {
-          debugPrint('✅ ${response.meta.totalFound} drivers found');
-
-          for (final item in response.data) {
-            debugPrint(
-              '🚗 ${item.driver.name} | '
-                  '${item.distanceKm} km | '
-                  'ETA: ${item.estimatedArrival}',
-            );
-          }
-        } else {
-          debugPrint('❌ ${response.message}');
-        }
-      },
-    );
-  }
+  // void listenToAvailableDrivers() {
+  //   _socketService.on(
+  //     'availableDrivers:response',
+  //         (data) {
+  //       debugPrint('📥 Available drivers response: $data');
+  //
+  //       final response = AvailableDriversResponse.fromJson(data);
+  //
+  //       if (response.success) {
+  //         debugPrint('✅ ${response.meta.totalFound} drivers found');
+  //
+  //         for (final item in response.data) {
+  //           debugPrint(
+  //             '🚗 ${item.driver.name} | '
+  //                 '${item.distanceKm} km | '
+  //                 'ETA: ${item.estimatedArrival}',
+  //           );
+  //         }
+  //       } else {
+  //         debugPrint('❌ ${response.message}');
+  //       }
+  //     },
+  //   );
+  // }
 
 
 

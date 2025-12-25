@@ -41,7 +41,7 @@ class _LoginFormState extends State<LoginForm> {
         } else if (user?.userType == "driver") {
           final SocketEvents socketEvents = SocketEvents();
           socketEvents.openSocketConnection('driver:online','online');
-          socketEvents.listenToLocationUpdates();
+          // socketEvents.listenToLocationUpdates();
           await Navigator.pushReplacement(
             context,
             MaterialPageRoute(

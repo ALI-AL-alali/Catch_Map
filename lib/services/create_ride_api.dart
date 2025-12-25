@@ -4,8 +4,15 @@ import 'package:http/http.dart' as http;
 
 import '../core/const/endpoint.dart';
 
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+
+import '../core/const/endpoint.dart';
+
+import '../models/ride_response.dart';
+
 class RideApiService {
-  Future<void> createRide({
+  Future<RideCreateResponse> createRide({
     required String startAddress,
     required String endAddress,
     required double distance,
@@ -19,8 +26,8 @@ class RideApiService {
         url,
         headers: {
           "Content-Type": "application/json",
-          "Authorization":"Bearer ${token}",
-
+          "Accept": "application/json",
+          "Authorization": "Bearer $token",
         },
         body: jsonEncode({
           "pickup_address": startAddress,
@@ -34,12 +41,17 @@ class RideApiService {
       print("STATUS: ${response.statusCode}");
       print("BODY: ${response.body}");
 
-      if (response.statusCode != 200 && response.statusCode != 201) {
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return RideCreateResponse.fromJson(
+          jsonDecode(response.body),
+        );
+      } else {
         throw Exception("Failed to create ride");
       }
     } catch (e) {
       print("ERROR: $e");
-      rethrow; // مهم إذا بدك تتعامل مع الخطأ فوق
+      rethrow;
     }
   }
 }
+
