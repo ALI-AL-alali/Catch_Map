@@ -321,6 +321,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                         currentRideId = response.data.rideId;
 
                         await socketEvents.openSocketCustomerConnection();
+                        // socketEvents.joinRide(rideId: currentRideId!);
+
                         // جلب السائقين من الباك
                         final driversResponse = await fetchDrivers();
                         final List<DriverData> drivers = driversResponse?.data ?? [];
@@ -433,6 +435,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   onPressed: () async{
 
                     socketEvents.sendCustomerPickupLocation(pickupLat: startPoint!.latitude, pickupLng: startPoint!.longitude);
+                                            socketEvents.joinRide(rideId: currentRideId!);
+
                     // socketEvents.listenToAvailableDrivers();
                      Navigator.pop(context);
                     setState(() => showDriversOverlay = true);

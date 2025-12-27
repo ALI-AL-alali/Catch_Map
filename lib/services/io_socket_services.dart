@@ -4,13 +4,16 @@ import 'package:map/core/utils/cachenetwork.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
 class SocketService {
-   io.Socket? _socket;
+  io.Socket? _socket;
 
   // Initialize connection to the server with authentication token
-  Future<void> connect(String serverUrl,String event,String status,{
+  Future<void> connect(
+    String serverUrl,
+    String event,
+    String status, {
     VoidCallback? onConnected,
   }) async {
-    final token1 = await token;
+    final token1 = token;
 
     if (token1 == null) {
       debugPrint('Error: Una ble to retrieve access token.');
@@ -24,24 +27,24 @@ class SocketService {
       io.OptionBuilder()
           .setTransports(['websocket']) // Enable WebSocket transport
           .enableAutoConnect() // Automatically reconnect
-          .setExtraHeaders(
-              {'Authorization': 'Bearer $token1'}) // Send token in headers
+          .setExtraHeaders({
+            'Authorization': 'Bearer $token1',
+          }) // Send token in headers
           .setReconnectionDelay(5000) // Set reconnection delay
           .setAuth({'token': 'Bearer $token1'})
           .build(),
     );
 
     // Listen for connection events
-    // _socket?.onConnect((_) {
-    //   debugPrint('Connected to the server');
-    //   // _socket.emit('bid:placed', {'status': 'placed'});
-    //   _socket?.emit(event, {'status': status});
-    // });
+    _socket?.onConnect((_) {
+      debugPrint('Connected to the server');
+      _socket?.emit('bid:created', {'status': 'pending'});
+      _socket?.emit(event, {'status': status});
+    });
     _socket!.onConnect((_) {
       debugPrint('✅ Connected to the server');
       onConnected?.call();
     });
-
 
     _socket?.onConnectError((data) {
       debugPrint('Connection Error: $data');
@@ -69,18 +72,17 @@ class SocketService {
   //   }
   // }
 
-   void send(String event, dynamic data) {
-     if (_socket == null || !_socket!.connected) {
-       debugPrint('❌ Socket not connected. Cannot send $event');
-       return;
-     }
+  void send(String event, dynamic data) {
+    if (_socket == null || !_socket!.connected) {
+      debugPrint('❌ Socket not connected. Cannot send $event');
+      return;
+    }
 
-     debugPrint('Attempting to send data: Event=$event, Data=$data');
-     _socket!.emit(event, data);
-   }
+    debugPrint('Attempting to send data: Event=$event, Data=$data');
+    _socket!.emit(event, data);
+  }
 
-
-   // Listen for incoming data from the server
+  // Listen for incoming data from the server
   // void on(String event, Function(dynamic data) callback) {
   //   debugPrint('Listening for event: $event');
   //   _socket.on(event, (data) {
@@ -88,21 +90,20 @@ class SocketService {
   //     callback(data);
   //   });
   // }
-   void on(String event, Function(dynamic data) callback) {
-     if (_socket == null) {
-       debugPrint('❌ Socket not initialized yet. Cannot listen to $event');
-       return;
-     }
+  void on(String event, Function(dynamic data) callback) {
+    if (_socket == null) {
+      debugPrint('❌ Socket not initialized yet. Cannot listen to $event');
+      return;
+    }
 
-     debugPrint('Listening for event: $event');
-     _socket!.on(event, (data) {
-       debugPrint('Data received for event $event: $data');
-       callback(data);
-     });
-   }
+    debugPrint('Listening for event: $event');
+    _socket!.on(event, (data) {
+      debugPrint('Data received for event $event: $data');
+      callback(data);
+    });
+  }
 
-
-   // Remove a specific listener for an event
+  // Remove a specific listener for an event
   void off(String event) {
     debugPrint('Removing listener for event: $event');
     _socket?.off(event);
@@ -143,11 +144,7 @@ class SocketService {
   //   );
   //   return connected;
   // }
-   bool isConnected() {
-     return _socket?.connected ?? false;
-   }
-
-
-
-
+  bool isConnected() {
+    return _socket?.connected ?? false;
+  }
 }

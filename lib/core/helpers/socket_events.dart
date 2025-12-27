@@ -51,7 +51,7 @@ class SocketEvents {
     // listenToAvailableDrivers();
   }
 
-
+ 
   void requestRideBids({
     required int rideId,
     required Function(dynamic data) onData,
@@ -150,6 +150,42 @@ class SocketEvents {
       },
     );
   }
+
+
+
+
+/// 🔗 Join ride room (equivalent to socket.emit("ride:join"))
+Future<void> joinRide({
+  required int rideId,
+}) async {
+  try {
+    // تأكد من الاتصال
+    if (!_socketService.isConnected()) {
+      debugPrint('⚠️ Socket not connected, connecting now...');
+      await _socketService.connect(
+        EndPoint.socketUrl,
+        'ride:join',
+        'join',
+      );
+    }
+
+    debugPrint('📤 Joining ride room: $rideId');
+
+    // إرسال الحدث
+    _socketService.send(
+      'ride:join',
+      {
+        'ride_id': rideId,
+      },
+    );
+  } catch (e, stackTrace) {
+    debugPrint('❌ joinRide error: $e');
+    debugPrint('📌 StackTrace: $stackTrace');
+  }
+}
+
+
+
 
 
   // void listenToAvailableDrivers() {

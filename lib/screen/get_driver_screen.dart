@@ -25,14 +25,14 @@ class DriverItem {
 
   VoidCallback? onRemoveWithAnimation;
 
-
   DriverItem({
     required this.driverId,
     required this.driverName,
     required this.basePrice,
     required this.status,
     this.driverPrice,
-    this.driverMockImageUrl = "https://i.pravatar.cc/150?img=1", required this.driverMockName,
+    this.driverMockImageUrl = "https://i.pravatar.cc/150?img=1",
+    required this.driverMockName,
   });
 
   void startTimer(VoidCallback onFinish) {
@@ -86,16 +86,9 @@ class _AnimatedDriverCardState extends State<AnimatedDriverCard>
   Timer? _uiUpdateTimer;
   SocketEvents socketEvents = SocketEvents();
 
-
-
-
-
-
-
   @override
   void initState() {
     super.initState();
-
 
     _uiUpdateTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
       if (mounted) setState(() {});
@@ -218,8 +211,6 @@ class _AnimatedDriverCardState extends State<AnimatedDriverCard>
     setState(() {});
     _exitController!.forward();
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -348,8 +339,11 @@ class _AnimatedDriverCardState extends State<AnimatedDriverCard>
             ),
 
             OutlinedButton(
-              onPressed: (){
-                socketEvents.startListeningToSocketEvents('ride:price-update', 'update');
+              onPressed: () {
+                // socketEvents.startListeningToSocketEvents(
+                //   'ride:price-update',
+                //   'update',
+                // );
               },
               style: OutlinedButton.styleFrom(
                 minimumSize: const Size(double.infinity, 48),
@@ -405,68 +399,60 @@ class _MockOffersScreenState extends State<MockOffersScreen> {
   final List<DriverItem> activeOffers = [];
   final SocketEvents socketEvents = SocketEvents();
 
+  // Future<void> _fetchBids() async {
+  //   final rideServices= RideApiService();
+  //   try {
+  //     final response = await getBids(widget.rideId); // ride_id = 15
 
+  //     if (!mounted) return;
 
-  Future<void> _fetchBids() async {
-    final rideServices= RideApiService();
-    try {
-      final response = await getBids(widget.rideId); // ride_id = 15
+  //     final List<DriverItem> items = response.data.bids.map((bid) {
+  //       final item = DriverItem(
+  //         driverId: bid.driver.id,               // 53
+  //         driverName: bid.driver.name,            // "32سائق تجريبي"
+  //         basePrice: int.parse(
+  //           bid.price.split('.').first,           // "888.00" → 888
+  //         ),
+  //         driverPrice: int.parse(
+  //           bid.price.split('.').first,
+  //         ),
+  //         status: bid.isAccepted ? "accepted" : "pending",
+  //         driverMockName: bid.driver.name,
+  //         driverMockImageUrl:
+  //         "https://i.pravatar.cc/150?img=${bid.driver.id}",
+  //       );
 
-      if (!mounted) return;
+  //       item.onRemoveWithAnimation = () => _removeOfferItem(item);
 
-      final List<DriverItem> items = response.data.bids.map((bid) {
-        final item = DriverItem(
-          driverId: bid.driver.id,               // 53
-          driverName: bid.driver.name,            // "32سائق تجريبي"
-          basePrice: int.parse(
-            bid.price.split('.').first,           // "888.00" → 888
-          ),
-          driverPrice: int.parse(
-            bid.price.split('.').first,
-          ),
-          status: bid.isAccepted ? "accepted" : "pending",
-          driverMockName: bid.driver.name,
-          driverMockImageUrl:
-          "https://i.pravatar.cc/150?img=${bid.driver.id}",
-        );
+  //       item.startTimer(() {
+  //         if (mounted) _removeOfferItem(item);
+  //       });
 
-        item.onRemoveWithAnimation = () => _removeOfferItem(item);
+  //       return item;
+  //     }).toList();
 
-        item.startTimer(() {
-          if (mounted) _removeOfferItem(item);
-        });
+  //     setState(() {
+  //       activeOffers
+  //         ..clear()
+  //         ..addAll(items);
+  //     });
 
-        return item;
-      }).toList();
-
-
-      setState(() {
-        activeOffers
-          ..clear()
-          ..addAll(items);
-      });
-
-
-      // setState(() {
-      //   activeOffers.clear();
-      //   activeOffers.addAll(items);
-      // });
-    } catch (e) {
-      debugPrint("Error fetching bids: $e");
-    }
-  }
-
+  //     // setState(() {
+  //     //   activeOffers.clear();
+  //     //   activeOffers.addAll(items);
+  //     // });
+  //   } catch (e) {
+  //     debugPrint("Error fetching bids: $e");
+  //   }
+  // }
 
   static Future<BidsResponse> getBids(int rideId) async {
-    final t = await token;
+    final t = token;
     debugPrint('TOKEN => $t');
 
     final response = await http.get(
       Uri.parse("${EndPoint.getDriver}/$rideId/bids"),
-      headers: {
-        "Accept": "application/json",
-        "Authorization": "Bearer $t",
-      },
+      headers: {"Accept": "application/json", "Authorization": "Bearer $t"},
     );
 
     debugPrint('STATUS CODE => ${response.statusCode}');
@@ -478,7 +464,6 @@ class _MockOffersScreenState extends State<MockOffersScreen> {
       throw Exception("فشل تحميل العروض");
     }
   }
-
 
   void _loadBidsFromSocket() {
     socketEvents.requestRideBids(
@@ -497,7 +482,7 @@ class _MockOffersScreenState extends State<MockOffersScreen> {
             status: bid['status'],
             driverMockName: bid['driver']['name'],
             driverMockImageUrl:
-            'https://i.pravatar.cc/150?img=${bid['driver']['id']}',
+                'https://i.pravatar.cc/150?img=${bid['driver']['id']}',
           );
 
           item.onRemoveWithAnimation = () => _removeOfferItem(item);
@@ -518,17 +503,51 @@ class _MockOffersScreenState extends State<MockOffersScreen> {
     );
   }
 
-
-
-
-
   @override
   void initState() {
     super.initState();
-    _fetchBids();
+    // _fetchBids();
+
+    socketEvents.joinRide(rideId: widget.rideId);
+
+    /// 2️⃣ طلب عروض السائقين
+    socketEvents.requestRideBids(
+      rideId: widget.rideId,
+      onData: (response) {
+        if (!mounted) return;
+
+        final List bids = response['data']['bids'];
+
+        final items = bids.map<DriverItem>((bid) {
+          final item = DriverItem(
+            driverId: bid['driver']['id'],
+            driverName: bid['driver']['name'],
+            basePrice: int.parse(bid['price']),
+            driverPrice: int.parse(bid['price']),
+            status: bid['status'],
+            driverMockName: bid['driver']['name'],
+            driverMockImageUrl:
+                'https://i.pravatar.cc/150?img=${bid['driver']['id']}',
+          );
+
+          item.onRemoveWithAnimation = () => _removeOfferItem(item);
+
+          item.startTimer(() {
+            if (mounted) _removeOfferItem(item);
+          });
+
+          return item;
+        }).toList();
+
+        setState(() {
+          activeOffers
+            ..clear()
+            ..addAll(items);
+        });
+      },
+    );
     // _addMockDriversSequentially();
     // _loadBidsFromSocket();
-
   }
 
   // void _addMockDriversSequentially() async {
@@ -555,18 +574,18 @@ class _MockOffersScreenState extends State<MockOffersScreen> {
   //   }
   // }
 
-  void _removeOfferItem(DriverItem item) async{
+  void _removeOfferItem(DriverItem item) async {
     item.cancelTimer();
 
     if (!mounted) return;
-     socketEvents.startListeningToSocketEvents('bid:rejected','rejected');
+    socketEvents.startListeningToSocketEvents('bid:rejected', 'rejected');
     setState(() => activeOffers.remove(item));
   }
 
   void _acceptOffer(String driverEmail) async {
     if (!mounted) return;
-     socketEvents.startListeningToSocketEvents('bid:accepted','accepted');
-    await ScaffoldMessenger.of(
+    socketEvents.startListeningToSocketEvents('bid:accepted', 'accepted');
+    ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text("تم اختيار السائق: $driverEmail")));
     if (widget.onClose != null) widget.onClose!();
@@ -611,7 +630,8 @@ class _MockOffersScreenState extends State<MockOffersScreen> {
                           return AnimatedDriverCard(
                             key: ValueKey(item.driverId),
                             driverItem: item,
-                            onAccept: () => _acceptOffer(item.driverId.toString()),
+                            onAccept: () =>
+                                _acceptOffer(item.driverId.toString()),
                             onReject: () => item.onRemoveWithAnimation?.call(),
                           );
                         },
