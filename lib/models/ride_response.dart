@@ -29,6 +29,7 @@ class RideData {
   final String estimatedPrice;
   final String requestedAt;
 
+
   RideData({
     required this.rideId,
     required this.rideNumber,

@@ -9,6 +9,7 @@ import 'dart:async';
 import '../../services/graphhopper_service.dart';
 import '../../services/distance_api_service.dart';
 import '../../models/distance_result_model.dart';
+import '../core/utils/cachenetwork.dart';
 import '../models/driver_model.dart';
 import '../services/create_ride_api.dart';
 import '../widgets/route_card.dart';
@@ -41,6 +42,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
   String graphDistance = "";
   String graphDuration = "";
 
+
   final graphhopper = GraphHopperService();
   final apiService = DistanceApiService();
   final SocketEvents socketEvents = SocketEvents();
@@ -67,6 +69,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     LatLng(33.5160, 36.2780),
   ];
   int? currentRideId;
+  int? customerRideId;
+  Set<Marker> driverMarkers = {};
+
 
   @override
   void initState() {
@@ -84,8 +89,32 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     });
 
     _getCurrentLocation();
-    _addDriverMarkers(); // إضافة الماركرات الخاصة بالسيارات
+    // _addDriverMarkers(); // إضافة الماركرات الخاصة بالسيارات
+    socketEvents.listenToNearbyDrivers((drivers) {
+      final markers = drivers.map((driver) {
+        return Marker(
+          markerId: MarkerId("driver_${driver['driver_id']}"),
+          position: LatLng(
+            driver['lat'],
+            driver['lng'],
+          ),
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueBlue,
+          ),
+        );
+      }).toSet();
 
+      setState(() {
+        driverMarkers = markers;
+      });
+    });
+  }
+
+  void _fetchNearbyDrivers(double lat, double lng) {
+    socketEvents.getNearbyDrivers(
+      pickUpLat: lat,
+      pickUpLng: lng,
+    );
   }
 
   // إضافة الماركرات الخاصة بالسيارات المتواجدة
@@ -186,6 +215,34 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
       }
     });
   }
+  Timer? _locationTimer;
+  void _startSendingLocationInRide() {
+    _locationTimer = Timer.periodic(
+      const Duration(seconds: 5),
+          (timer) async {
+        try {
+          final position = await Geolocator.getCurrentPosition(
+            desiredAccuracy: LocationAccuracy.high,
+          );
+          final String? customerIdStr = Cachenetwork.getdata("user_id");
+          if (customerIdStr == null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("خطأ: لم يتم العثور على بيانات المستخدم")),
+            );
+            return;
+          }
+
+          final int customerId = int.parse(customerIdStr);
+          socketEvents.sendCustomerLocation(
+              customerId: customerId, // ID السائق
+              lat: position.latitude,
+              lng: position.longitude,
+              rideId:currentRideId!
+          );
+        } catch (e) {
+          debugPrint('❌ Error getting location: $e');
+        }
+      },);}
 
   Future<void> _getGraphhopperRoute() async {
     if (startPoint == null || endPoint == null) return;
@@ -235,6 +292,10 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
         context,
       ).showSnackBar(const SnackBar(content: Text("حدد نقطتين أولًا")));
     }
+
+
+
+
 
     // if (startPoint != null && endPoint != null) {
     //   ScaffoldMessenger.of(
@@ -320,8 +381,18 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
 
                         currentRideId = response.data.rideId;
 
+
+
                         await socketEvents.openSocketCustomerConnection();
-                        // socketEvents.joinRide(rideId: currentRideId!);
+                        socketEvents.newRide(
+                          pickupAddress: "المزة",
+                          dropOffAddress: "الميدان",
+                          distance: 25.2,
+                          estimatedDuration: 2500,
+                          estimatedPrice: price.toDouble()
+                        );
+
+                        _startSendingLocationInRide();
 
                         // جلب السائقين من الباك
                         final driversResponse = await fetchDrivers();
@@ -437,6 +508,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                     socketEvents.sendCustomerPickupLocation(pickupLat: startPoint!.latitude, pickupLng: startPoint!.longitude);
                                             socketEvents.joinRide(rideId: currentRideId!);
 
+
                     // socketEvents.listenToAvailableDrivers();
                      Navigator.pop(context);
                     setState(() => showDriversOverlay = true);
@@ -478,7 +550,11 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               GoogleMap(
                 initialCameraPosition: _initialPosition,
                 onMapCreated: (controller) => _controller.complete(controller),
-                markers: _markers,
+                markers: {
+                  ..._markers,
+                  ...driverMarkers,
+                },
+
                 polylines: {
                   if (animatedRoute.isNotEmpty)
                     Polyline(
@@ -535,6 +611,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               color: Colors.black.withOpacity(0.5), // خلفية شفافة على الخريطة
               child: MockOffersScreen(
                 rideId: currentRideId!,
+                price: (serverResult?.calculated_price ?? 20000).toDouble(),
                 onClose: () => setState(() => showDriversOverlay = false),
               ),
             ),

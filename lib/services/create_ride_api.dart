@@ -38,6 +38,7 @@ class RideApiService {
         }),
       );
 
+      print("TOKEN: $token");
       print("STATUS: ${response.statusCode}");
       print("BODY: ${response.body}");
 
