@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:map/core/helpers/socket_events.dart';
 import 'package:map/core/utils/cachenetwork.dart';
 import 'package:map/screen/auth/login_screen.dart';
 
 void main() async {
-
   WidgetsFlutterBinding.ensureInitialized();
 
   await Cachenetwork.init();

@@ -4,6 +4,7 @@ import 'package:map/core/helpers/app_routes.dart';
 import 'package:map/core/helpers/validators.dart';
 import 'package:map/screen/driver_screen.dart';
 import 'package:map/screen/map_screen.dart';
+import 'package:map/screen/osm/home_page.dart';
 import 'package:map/services/auth_api.dart';
 import 'package:map/widgets/custom_input.dart';
 
@@ -33,14 +34,17 @@ class _LoginFormState extends State<LoginForm> {
         );
 
         if (user?.userType == "customer") {
-
           await Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (_) => const MapScreen()),
+            MaterialPageRoute(builder: (_) => const HomePage()),
           );
+          // await Navigator.pushReplacement(
+          //   context,
+          //   MaterialPageRoute(builder: (_) => const MapScreen()),
+          // );
         } else if (user?.userType == "driver") {
           final SocketEvents socketEvents = SocketEvents();
-          socketEvents.openSocketConnection('driver:online','online');
+          socketEvents.openSocketConnection('driver:online', 'online');
           // socketEvents.listenToLocationUpdates();
           await Navigator.pushReplacement(
             context,
