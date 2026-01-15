@@ -76,20 +76,290 @@ class AnimatedDriverCard extends StatefulWidget {
   State<AnimatedDriverCard> createState() => _AnimatedDriverCardState();
 }
 
-class _AnimatedDriverCardState extends State<AnimatedDriverCard> {
+class _AnimatedDriverCardState extends State<AnimatedDriverCard> with TickerProviderStateMixin {
+  late AnimationController _enterController;
+  late Animation<Offset> _slide;
+  late Animation<double> _fade;
+  late Animation<double> _scale;
 
+  AnimationController? _exitController;
+  Animation<Offset>? _slideOut;
+  Animation<double>? _rotateOut;
+  Animation<double>? _sizeAnimation;
+  Animation<double>? _fadeExitAnimation;
+
+  bool isExiting = false;
+
+  final double totalSeconds = 30;
+  double remainingSeconds = 30;
+  Timer? _timer;
 
   @override
   void initState() {
-    widget.socketEvents.listenToUpdatePrice((data) {
-      debugPrint('🎉 Price updated: $data');
-    },);
     super.initState();
+
+    _enterController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    );
+
+    _slide = Tween<Offset>(begin: const Offset(1.2, 0), end: Offset.zero)
+        .chain(CurveTween(curve: Curves.easeOutBack))
+        .animate(_enterController);
+
+    _fade = Tween<double>(begin: 0, end: 1).animate(_enterController);
+    _scale = Tween<double>(begin: 0.95, end: 1.0).animate(_enterController);
+
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) _enterController.forward();
+    });
+
+    _startTimer();
   }
 
+  void _startTimer() {
+    _timer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
+      if (!mounted) return;
+
+      setState(() {
+        remainingSeconds -= 0.1;
+        if (remainingSeconds <= 0) {
+          remainingSeconds = 0;
+          timer.cancel();
+          _rejectWithAnimation();
+        }
+      });
+    });
+  }
+
+  void _rejectWithAnimation() {
+    if (isExiting || !mounted) return;
+    isExiting = true;
+    _timer?.cancel();
+
+    _startExitAnimation(
+      slideEnd: const Offset(-2, 1),
+      rotateEnd: 0.3,
+      onComplete: widget.onReject,
+    );
+  }
+
+  void _acceptWithAnimation() {
+    if (isExiting || !mounted) return;
+    isExiting = true;
+    _timer?.cancel();
+
+    _startExitAnimation(
+      slideEnd: const Offset(2, 1),
+      rotateEnd: -0.3,
+      onComplete: widget.onAccept,
+    );
+  }
+
+  void _startExitAnimation({
+    required Offset slideEnd,
+    required double rotateEnd,
+    required VoidCallback onComplete,
+  }) {
+    _exitController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+
+    _slideOut = Tween<Offset>(begin: Offset.zero, end: slideEnd)
+        .animate(CurvedAnimation(parent: _exitController!, curve: Curves.easeIn));
+
+    _rotateOut = Tween<double>(begin: 0, end: rotateEnd)
+        .animate(CurvedAnimation(parent: _exitController!, curve: Curves.easeIn));
+
+    _sizeAnimation = Tween<double>(begin: 1, end: 0).animate(
+      CurvedAnimation(
+        parent: _exitController!,
+        curve: const Interval(0.5, 1, curve: Curves.easeOut),
+      ),
+    );
+
+    _fadeExitAnimation = Tween<double>(begin: 1, end: 0).animate(
+      CurvedAnimation(
+        parent: _exitController!,
+        curve: const Interval(0.5, 1, curve: Curves.easeOut),
+      ),
+    );
+
+    _exitController!.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        onComplete();
+      }
+    });
+
+    _exitController!.forward();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _enterController.dispose();
+    _exitController?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = remainingSeconds / totalSeconds;
+
+    final card = Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                ClipOval(
+                  child: Image.network(
+                    widget.driverItem.driverMockImageUrl,
+                    width: 50,
+                    height: 50,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const Icon(Icons.person, size: 50),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.driverItem.driverName,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      "تقييم 4.8 ⭐",  // يمكن تعديل التقييم إذا كانت البيانات متوفرة
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.amber.shade700,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              "السعر المبدئي: ${widget.driverItem.basePrice} ل.س",
+              style: const TextStyle(color: Colors.grey),
+            ),
+            if (widget.driverItem.driverPrice != null)
+              Text(
+                "عرض السائق: ${widget.driverItem.driverPrice} ل.س",
+                style: const TextStyle(
+                  color: Colors.green,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            const SizedBox(height: 12),
+            Text(
+              "معرف الرحلة: ${widget.driverItem.driverId}",
+              style: TextStyle(color: Colors.grey),
+            ),
+            const SizedBox(height: 12),
+            InkWell(
+              onTap: () => _showUpdatePriceDialog(widget.driverItem),
+              child: Text(
+                'تغيير السعر',
+                style: TextStyle(color: Colors.blue),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _rejectWithAnimation,
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 48),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text("رفض"),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: _acceptWithAnimation,
+                    child: SizedBox(
+                      height: 48,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade200,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Stack(
+                          children: [
+                            // زر القبول مع تقدم الأنيميشن (عرض التقدم على الزر)
+                            FractionallySizedBox(
+                              widthFactor: progress,
+                              alignment: Alignment.centerRight,
+                              child: Container(
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: Colors.green.shade700,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                            ),
+                            const Center(
+                              child: Text(
+                                "قبول",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (isExiting && _sizeAnimation != null) {
+      return FadeTransition(
+        opacity: _fadeExitAnimation!,
+        child: SizeTransition(
+          sizeFactor: _sizeAnimation!,
+          child: Transform.rotate(
+            angle: _rotateOut!.value,
+            child: SlideTransition(position: _slideOut!, child: card),
+          ),
+        ),
+      );
+    }
+
+    return FadeTransition(
+      opacity: _fade,
+      child: SlideTransition(
+        position: _slide,
+        child: ScaleTransition(scale: _scale, child: card),
+      ),
+    );
+  }
 
   Future<void> _showUpdatePriceDialog(DriverItem item) async {
-
     final TextEditingController priceController =
     TextEditingController(text: item.driverPrice?.toString() ?? '');
 
@@ -113,11 +383,9 @@ class _AnimatedDriverCardState extends State<AnimatedDriverCard> {
             ),
             ElevatedButton(
               onPressed: () {
-                final newPrice =
-                double.tryParse(priceController.text);
+                final newPrice = double.tryParse(priceController.text);
 
                 if (newPrice == null || newPrice <= 0) {
-
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('الرجاء إدخال سعر صحيح'),
@@ -125,151 +393,32 @@ class _AnimatedDriverCardState extends State<AnimatedDriverCard> {
                   );
                   return;
                 }
-                int? rideId;
+
+                // تحديث السعر
                 setState(() {
                   item.driverPrice = newPrice.toInt();
                 });
-                widget.socketEvents.updatePrice(newPrice: newPrice, bidId: item.bidId,rideId:  widget.rideId);
 
+                // ارسال التحديث عبر Socket
+                widget.socketEvents.updatePrice(newPrice: newPrice, bidId: item.bidId, rideId: widget.rideId);
 
-
-                Navigator.pop(context);
+                // إزالة الكارد من الواجهة
                 widget.onPriceUpdated();
 
-
+                // إغلاق نافذة الحوار
+                Navigator.pop(context);
               },
               child: const Text('تحديث السعر'),
-            ),
+            )
+
           ],
         );
       },
     );
   }
-
-  @override
-  Widget build(BuildContext context) {
-    final item = widget.driverItem;
-
-    Widget cardContent = Card(
-      elevation: 4,
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                ClipOval(
-                  child: Image.network(
-                    item.driverMockImageUrl,
-                    width: 50,
-                    height: 50,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const Icon(Icons.person, size: 50),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.driverName,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      "تقييم 4.8 ⭐",  // هنا يمكن تعديل التقييم إذا كانت البيانات متوفرة
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.amber.shade700,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              "السعر المبدئي: ${item.basePrice} ل.س",  // عرض السعر
-              style: const TextStyle(color: Colors.grey),
-            ),
-            if (item.driverPrice != null)
-              Text(
-                "عرض السائق: ${item.driverPrice} ل.س",  // عرض سعر السائق إذا كان متاحًا
-                style: const TextStyle(
-                  color: Colors.green,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            const SizedBox(height: 12),
-            // عرض تفاصيل إضافية مثل `ride_id` و `driver_id`
-            Text(
-              "معرف الرحلة: ${item.driverId}",
-              style: TextStyle(color: Colors.grey),
-            ),
-            const SizedBox(height: 12),
-            InkWell(
-              onTap: (){
-                _showUpdatePriceDialog(item);
-              },
-              child: Text(
-                'تغيير السعر'
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: widget.onReject,
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 48),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: const Text("رفض"),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: widget.onAccept,
-                    child: SizedBox(
-                      height: 48,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.green.shade200,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Center(
-                          child: Text(
-                            "قبول",
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-
-    return cardContent;
-  }
 }
+
+
 
 
 // ---------------- MockOffersScreen (Overlay) ----------------
@@ -445,7 +594,7 @@ class _MockOffersScreenState extends State<MockOffersScreen> {
 
   void _handleRideStatus(String status, dynamic data) {
     switch (status) {
-      case 'on-the-way':
+      case 'arriving':
         _showOnTheWaySheet(data);
         break;
 
@@ -454,7 +603,7 @@ class _MockOffersScreenState extends State<MockOffersScreen> {
         break;
 
       case 'finished':
-      case 'complete':
+      case 'completed':
         _showFinishedSheet();
         break;
     }

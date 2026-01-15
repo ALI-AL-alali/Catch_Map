@@ -114,15 +114,18 @@ class _MapRoutePageState extends State<MapRoutePage> {
     _initSocket(); // ✅ جديد
   }
 
-  Future<void> _initSocket() async {
-    // افتح الاتصال (إذا أنت عندك openSocketCustomerConnection)
-    await socketEvents.openSocketCustomerConnection();
+  bool _socketReady = false;
 
-    // استمع للنتيجة القادمة من السيرفر
+  Future<void> _initSocket() async {
+    if (_socketReady) return;
+
+    await socketEvents.openSocketCustomerConnection();
+    _socketReady = true;
+
     socketEvents.listenToNearbyDrivers((drivers) {
       final markers = drivers.map<Marker>((driver) {
-        final lat = (driver['lat'] as num).toDouble();
-        final lng = (driver['lng'] as num).toDouble();
+        final lat = ((driver['lat'] ?? driver['latitude']) as num).toDouble();
+        final lng = ((driver['lng'] ?? driver['longitude']) as num).toDouble();
 
         return Marker(
           point: LatLng(lat, lng),
@@ -136,10 +139,8 @@ class _MapRoutePageState extends State<MapRoutePage> {
       setState(() => driverMarkers = markers);
     });
 
-    // بعد ما صار متصل فعلاً… اطلب السائقين القريبين
     _fetchNearbyDrivers(startLatLng.latitude, startLatLng.longitude);
 
-    // ✅ (اختياري) تحديث كل 5 ثواني لتحديث مواقع السائقين حولك
     _nearbyTimer?.cancel();
     _nearbyTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       _fetchNearbyDrivers(startLatLng.latitude, startLatLng.longitude);
