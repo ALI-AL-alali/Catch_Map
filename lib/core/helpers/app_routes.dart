@@ -11,7 +11,7 @@ class AppRoutes {
 
   static Map<String, WidgetBuilder> routes = {
     login: (context) => const LoginScreen(),
-    mapScreen: (context) => const MapScreen(),
+    // mapScreen: (context) => const MapScreen(),
     driverScreen: (context) => const DriverScreen(driverName: 'name'),
   };
 }

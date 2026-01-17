@@ -148,16 +148,66 @@ class SocketEvents {
       ),
     ).listen((Position position) {
       // Handle location updates
-      _socketService.send('driver:location:update', {
+      _socketService.send('ride:tracking:update', {
         'lat': position.latitude,
         'lng': position.longitude,
         'ride_id': 'currentRideId',  // Pass the ride ID dynamically
-        'heading': position.heading,
-        'speed': position.speed
+        // 'heading': position.heading,
+        // 'speed': position.speed
       });
       debugPrint('Location updated: ${position.latitude}, ${position.longitude}');
     });
   }
+
+  StreamSubscription<Position>? _posSub;
+  int? _activeRideId;
+  String? _driverId;
+
+  Future<void> startLocationTracking({
+    required int rideId,
+    required String driverId,
+  }) async {
+    _activeRideId = rideId;
+    _driverId = driverId;
+
+    await _checkLocationPermission();
+
+    final settings = const LocationSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 5,
+    );
+
+    await _posSub?.cancel();
+    _posSub = Geolocator.getPositionStream(locationSettings: settings)
+        .listen((Position position) {
+      final id = _activeRideId;
+      final dId = _driverId;
+      if (id == null || dId == null) return;
+
+      _socketService.send('ride:tracking:update', {
+        'lat': position.latitude,
+        'lng': position.longitude,
+        'ride_id': id,
+        'driver_id': dId,
+      });
+    });
+  }
+
+  void stopLocationTracking() {
+    _activeRideId = null;
+    _driverId = null;
+    _posSub?.cancel();
+    _posSub = null;
+  }
+
+  void listenToDriverTracking(void Function(dynamic data) onData) {
+    _socketService.on('ride:tracking:update', (data) => onData(data));
+  }
+
+
+
+
+
 
 
   Future<void> _checkLocationPermission() async {

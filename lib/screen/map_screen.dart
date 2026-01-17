@@ -1,320 +1,869 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:map/core/const/endpoint.dart';
-import 'package:map/core/helpers/socket_events.dart';
-import 'package:map/services/get_driver.dart';
-import 'dart:async';
-import '../../services/graphhopper_service.dart';
-import '../../services/distance_api_service.dart';
-import '../../models/distance_result_model.dart';
-import '../core/utils/cachenetwork.dart';
-import '../models/driver_model.dart';
-import '../services/create_ride_api.dart';
-import '../widgets/route_card.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
-
-import 'get_driver_screen.dart'; // إضافة مكتبة geolocator
+import 'package:google_maps_flutter/google_maps_flutter.dart' as gml;
 import 'package:http/http.dart' as http;
+import 'package:latlong2/latlong.dart';
+
+// ====== your project imports ======
+import 'package:map/core/helpers/socket_events.dart';
+import 'package:map/core/utils/cachenetwork.dart';
+import 'package:map/models/distance_result_model.dart';
+import 'package:map/models/driver_model.dart';
+import 'package:map/screen/get_driver_screen.dart';
+import 'package:map/services/create_ride_api.dart';
+import 'package:map/services/distance_api_service.dart';
+import 'package:map/services/get_driver.dart';
+import 'package:map/widgets/route_card.dart';
+
+// class MapScreen extends StatefulWidget {
+//   final int rideId;
+//   const MapScreen({Key? key, required this.rideId}) : super(key: key);
+//
+//   @override
+//   _MapScreenState createState() => _MapScreenState();
+// }
+//
+// class _MapScreenState extends State<MapScreen> {
+//   late final LatLng startLatLng;
+//   late final LatLng endLatLng;
+//   late final List<LatLng> routePoints;
+//   bool loadingRoute = true;
+//
+//   // For the route and driver paths
+//   List<LatLng> driverToPickupPoints = [];
+//   List<Marker> markers = [];
+//   LatLng? driverLatLng; // Assuming the driver location will be available
+//
+//   final DistanceApiService apiService = DistanceApiService(); // Example for fetching distance
+//   final SocketEvents socketEvents = SocketEvents();
+//
+//   @override
+//   void initState() {
+//     super.initState();
+//     // For simplicity, initializing the start and end points with dummy coordinates
+//     startLatLng = LatLng(33.5138, 36.2765); // Example: Customer location
+//     endLatLng = LatLng(33.5200, 36.2800);   // Example: Destination location
+//
+//     // Load the route
+//     _loadRoute();
+//     _listenToRideStatus();
+//   }
+//
+//   // Listen to ride status updates
+//   _listenToRideStatus() {
+//     socketEvents.listenToRideUpdates((data) {
+//       if (!mounted || data == null) return;
+//
+//       final String status = data['status'];
+//       final int rideId = data['ride_id'];
+//
+//       if (rideId != widget.rideId) return;
+//       _handleRideStatus(status, data);
+//     });
+//   }
+//
+//   // Handle ride status updates and show the corresponding sheet
+//   void _handleRideStatus(String status, dynamic data) {
+//     switch (status) {
+//       case 'arriving':
+//         _showOnTheWaySheet(data);
+//         break;
+//       case 'arrived':
+//         _showArrivedSheet(data);
+//         break;
+//       case 'finished':
+//       case 'completed':
+//         socketEvents.stopLocationTracking();
+//         _showFinishedSheet();
+//         break;
+//     }
+//   }
+//
+//   void _showOnTheWaySheet(dynamic data) {
+//     showModalBottomSheet(
+//       context: context,
+//       shape: const RoundedRectangleBorder(
+//         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+//       ),
+//       builder: (_) => const _StatusSheet(
+//         icon: Icons.directions_car,
+//         title: 'السائق في طريقه إليك',
+//         subtitle: 'يرجى الاستعداد',
+//       ),
+//     );
+//   }
+//
+//   void _showArrivedSheet(dynamic data) {
+//     showModalBottomSheet(
+//       context: context,
+//       shape: const RoundedRectangleBorder(
+//         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+//       ),
+//       builder: (_) => const _StatusSheet(
+//         icon: Icons.location_on,
+//         title: 'السائق وصل',
+//         subtitle: 'يرجى التوجه إلى موقع الالتقاء',
+//       ),
+//     );
+//   }
+//
+//   void _showFinishedSheet() {
+//     showModalBottomSheet(
+//       context: context,
+//       isDismissible: false,
+//       shape: const RoundedRectangleBorder(
+//         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+//       ),
+//       builder: (_) => _StatusSheet(
+//         icon: Icons.check_circle,
+//         title: 'انتهت الرحلة',
+//         subtitle: 'نتمنى لك رحلة سعيدة 🌸',
+//       ),
+//     );
+//   }
+//
+//   Future<void> _loadRoute() async {
+//     setState(() => loadingRoute = true);
+//
+//     // Simulating fetching route data from an API
+//     final result = await _getRouteWithMeta(startLatLng.latitude, startLatLng.longitude, endLatLng.latitude, endLatLng.longitude);
+//
+//     setState(() {
+//       routePoints = result.points;
+//       loadingRoute = false;
+//     });
+//
+//     // If the route is valid, we can update the markers and polyline
+//     _addMarkers();
+//   }
+//
+//   Future<_OsrmRouteResult> _getRouteWithMeta(double startLat, double startLon, double endLat, double endLon) async {
+//     // Example response data
+//     await Future.delayed(Duration(seconds: 1)); // Simulating API delay
+//     return _OsrmRouteResult(
+//       points: [startLatLng, LatLng(33.5150, 36.2770), endLatLng],
+//       distanceMeters: 1500,
+//       durationSeconds: 900,
+//     );
+//   }
+//
+//   // Adding markers for start and end points
+//   void _addMarkers() {
+//     markers.add(Marker(
+//       point: startLatLng,
+//       width: 46,
+//       height: 46,
+//       child: const Icon(Icons.location_pin, color: Colors.green, size: 40),
+//     ));
+//     markers.add(Marker(
+//       point: endLatLng,
+//       width: 46,
+//       height: 46,
+//       child: const Icon(Icons.flag, color: Colors.red, size: 40),
+//     ));
+//
+//     // Assuming driverLatLng is updated when the driver location is received
+//     if (driverLatLng != null) {
+//       markers.add(Marker(
+//         point: driverLatLng!,
+//         width: 46,
+//         height: 46,
+//         child: const Icon(Icons.directions_car, color: Colors.blue, size: 40),
+//       ));
+//     }
+//
+//     setState(() {});
+//   }
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return Stack(
+//       children: [
+//         FlutterMap(
+//           options: MapOptions(
+//             initialCenter: startLatLng,
+//             initialZoom: 14,
+//             minZoom: 3,
+//             maxZoom: 19,
+//           ),
+//           children: [
+//             TileLayer(
+//               urlTemplate: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+//               subdomains: ['a', 'b', 'c'],
+//             ),
+//             if (routePoints.isNotEmpty)
+//               PolylineLayer(
+//                 polylines: [
+//                   Polyline(
+//                     points: routePoints,
+//                     color: Colors.black,
+//                     strokeWidth: 3,
+//                   ),
+//                 ],
+//               ),
+//             MarkerLayer(markers: markers),
+//           ],
+//         ),
+//         if (loadingRoute)
+//           const Positioned.fill(
+//             child: Center(child: CircularProgressIndicator()),
+//           ),
+//       ],
+//     );
+//   }
+// }
+//
+// class _OsrmRouteResult {
+//   final List<LatLng> points;
+//   final double distanceMeters;
+//   final double durationSeconds;
+//
+//   _OsrmRouteResult({
+//     required this.points,
+//     required this.distanceMeters,
+//     required this.durationSeconds,
+//   });
+// }
+//
+// class _StatusSheet extends StatelessWidget {
+//   final IconData icon;
+//   final String title;
+//   final String subtitle;
+//
+//   const _StatusSheet({
+//     required this.icon,
+//     required this.title,
+//     required this.subtitle,
+//   });
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return Padding(
+//       padding: const EdgeInsets.all(16),
+//       child: Column(
+//         mainAxisSize: MainAxisSize.min,
+//         crossAxisAlignment: CrossAxisAlignment.center,
+//         children: [
+//           Center(
+//             child: Container(
+//               width: 40,
+//               height: 5,
+//               decoration: BoxDecoration(
+//                 color: Colors.grey.shade400,
+//                 borderRadius: BorderRadius.circular(10),
+//               ),
+//             ),
+//           ),
+//           const SizedBox(height: 16),
+//           Icon(icon, size: 48, color: Colors.blue),
+//           const SizedBox(height: 12),
+//           Text(
+//             title,
+//             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+//           ),
+//           const SizedBox(height: 8),
+//           Text(subtitle, style: const TextStyle(color: Colors.grey)),
+//           const SizedBox(height: 20),
+//         ],
+//       ),
+//     );
+//   }
+// }
+
+
+
 
 class MapScreen extends StatefulWidget {
-  const MapScreen({super.key});
+  final String startPoint;
+  final String endPoint;
+  final double startLatitude;
+  final double startLongitude;
+  final double endLatitude;
+  final double endLongitude;
+
+  const MapScreen({
+    super.key, required this.startPoint, required this.endPoint, required this.startLatitude, required this.startLongitude, required this.endLatitude, required this.endLongitude,
+
+  });
 
   @override
   State<MapScreen> createState() => _MapScreenState();
 }
 
-class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
-  final Completer<GoogleMapController> _controller = Completer();
-  final Set<Marker> _markers = {};
-  final Set<Polyline> _polylines = {};
-  bool showDriversOverlay = false; // يتحكم بظهور Overlay السائقين
+class _MapScreenState extends State<MapScreen> {
 
-  late AnimationController polyAnimController;
-  List<LatLng> animatedRoute = [];
 
-  LatLng? startPoint;
- LatLng? endPoint;
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  PersistentBottomSheetController? _rideSheetController;
 
+  String? acceptedDriverId;
+  LatLng? driverLatLng;
+
+// Route: driver -> pickup
+  List<LatLng> driverToPickupPoints = [];
+  bool loadingDriverToPickup = false;
+
+  Timer? _driverRouteDebounce;
+  LatLng? _lastDriverRouteFrom;
+
+
+
+  void _showRideStatusSheet({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    bool dismissible = true,
+  }) {
+    // سكّر أي sheet قديم
+    _rideSheetController?.close();
+
+    _rideSheetController = _scaffoldKey.currentState?.showBottomSheet(
+          (context) => _StatusSheet(icon: icon, title: title, subtitle: subtitle),
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+    );
+
+    if (!dismissible) {
+      // إذا بدك تمنع السحب، بتقدر تتركه modal بدل showBottomSheet
+      // بس هيك غالباً كفاية للمشروع
+    }
+  }
+  void _debouncedUpdateDriverRoute(LatLng driverPos) {
+    // إذا ما تغيّر كثير، ما في داعي نعيد route
+    if (_lastDriverRouteFrom != null) {
+      final dx = (driverPos.latitude - _lastDriverRouteFrom!.latitude).abs();
+      final dy = (driverPos.longitude - _lastDriverRouteFrom!.longitude).abs();
+      if (dx < 0.0002 && dy < 0.0002) return; // ~20-30m تقريباً
+    }
+
+    _driverRouteDebounce?.cancel();
+    _driverRouteDebounce = Timer(const Duration(milliseconds: 600), () async {
+      _lastDriverRouteFrom = driverPos;
+      await _loadDriverToPickupRoute(driverPos, startLatLng);
+    });
+  }
+
+  Future<void> _loadDriverToPickupRoute(LatLng driver, LatLng pickup) async {
+    try {
+      final result = await _getRouteWithMeta(
+        driver.latitude,
+        driver.longitude,
+        pickup.latitude,
+        pickup.longitude,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        driverToPickupPoints = result.points;
+      });
+    } catch (_) {
+      // تجاهل
+    }
+  }
+
+
+
+  // ===== Map =====
+  final MapController mapController = MapController();
+  static const String tilesUrlTemplate =
+      "https://tiles.gocab.org/tile/{z}/{x}/{y}.png";
+
+  // نقاط الرحلة (ثابتة من HomePage)
+  late final LatLng startLatLng;
+  late final LatLng endLatLng;
+
+  // Route
+  List<LatLng> routePoints = [];
+  bool loadingRoute = true;
+
+  // ✅ NEW: route meta from OSRM
+  double? routeDistanceMeters; // meters
+  double? routeDurationSeconds; // seconds
+
+  // Drivers (socket)
+  Set<Marker> driverMarkers = {};
+  bool showDriversOverlay = false;
+
+  // Distance card
   DistanceResult? serverResult;
 
-  String graphDistance = "";
-  String graphDuration = "";
-
-
-  final graphhopper = GraphHopperService();
-  final apiService = DistanceApiService();
+  // Services
   final SocketEvents socketEvents = SocketEvents();
+  final DistanceApiService apiService = DistanceApiService();
 
-  static const CameraPosition _initialPosition = CameraPosition(
-    target: LatLng(33.5138, 36.2765),
-    zoom: 14,
-  );
-
-  BitmapDescriptor startIcon = BitmapDescriptor.defaultMarkerWithHue(
-    BitmapDescriptor.hueGreen,
-  );
-  BitmapDescriptor endIcon = BitmapDescriptor.defaultMarkerWithHue(
-    BitmapDescriptor.hueRed,
-  );
-  BitmapDescriptor driverIcon = BitmapDescriptor.defaultMarkerWithHue(
-    BitmapDescriptor.hueAzure, // رمز السيارة
-  );
-
-  List<LatLng> drivers = [
-    LatLng(33.5140, 36.2767), // مواقع السيارات
-    LatLng(33.5150, 36.2770),
-    LatLng(33.5125, 36.2750),
-    LatLng(33.5160, 36.2780),
-  ];
+  // Ride
   int? currentRideId;
-  int? customerRideId;
-  Set<Marker> driverMarkers = {};
+  Timer? _locationTimer;
 
+  // =========================
+  // ✅ Helpers (Price/Format)
+  // =========================
+  static const int pricePerKm = 9000;
+
+  int _estimatePriceFromMeters(double meters) {
+    final km = meters / 1000.0;
+    final raw = km * pricePerKm;
+
+    // تقريب لطيف (اختياري) لأقرب 500
+    final rounded = (raw / 500).round() * 500;
+    return rounded.toInt();
+  }
+
+  String _formatDistance(double meters) {
+    if (meters < 1000) return "${meters.toStringAsFixed(0)} م";
+    return "${(meters / 1000).toStringAsFixed(2)} كم";
+  }
+
+  String _formatDuration(double seconds) {
+    final totalMinutes = (seconds / 60).round();
+    final h = totalMinutes ~/ 60;
+    final m = totalMinutes % 60;
+    if (h <= 0) return "$m دقيقة";
+    return "$h ساعة و $m دقيقة";
+  }
 
   @override
   void initState() {
     super.initState();
-    polyAnimController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 2),
+
+    startLatLng = LatLng(widget.startLatitude, widget.startLongitude);
+    endLatLng   = LatLng(widget.endLatitude, widget.endLongitude);
+
+    _loadRoute();
+    _getServerDistance();
+    _listenToRideStatus();
+
+    _initSocket();
+  }
+  void _listenToRideStatus() {
+    socketEvents.listenToRideUpdates((data) {
+      if (!mounted || data == null) return;
+
+      final String? status = data['status'];
+      final int? rideId = (data['ride_id'] is int)
+          ? data['ride_id']
+          : int.tryParse('${data['ride_id']}');
+
+      if (status == null || rideId == null) return;
+
+      // ✅ فلترة على الرحلة الحالية
+      if (currentRideId != null && rideId != currentRideId) return;
+
+      _handleRideStatus(status, data);
+    });
+  }
+
+
+
+  void _handleRideStatus(String status, dynamic data) {
+    switch (status) {
+      case 'arriving':
+        _showRideStatusSheet(
+          icon: Icons.directions_car,
+          title: 'السائق في طريقه إليك',
+          subtitle: 'يرجى الاستعداد',
+        );
+        break;
+
+      case 'arrived':
+        _showRideStatusSheet(
+          icon: Icons.location_on,
+          title: 'السائق وصل',
+          subtitle: 'يرجى التوجه إلى موقع الالتقاء',
+        );
+        break;
+
+      case 'finished':
+      case 'completed':
+        socketEvents.stopLocationTracking();
+        _showRideStatusSheet(
+          icon: Icons.check_circle,
+          title: 'انتهت الرحلة',
+          subtitle: 'نتمنى لك رحلة سعيدة 🌸',
+          dismissible: false,
+        );
+        break;
+    }
+  }
+
+
+
+  void _showOnTheWaySheet(dynamic data) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => const _StatusSheet(
+        icon: Icons.directions_car,
+        title: 'السائق في طريقه إليك',
+        subtitle: 'يرجى الاستعداد',
+      ),
     );
-    polyAnimController.addListener(() {
-      if (_polylines.isEmpty) return;
-      int count = (_polylines.first.points.length * polyAnimController.value)
-          .floor();
-      if (count < 2) return;
-      setState(() => animatedRoute = _polylines.first.points.sublist(0, count));
+  }
+
+
+  void _showArrivedSheet(dynamic data) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => const _StatusSheet(
+        icon: Icons.location_on,
+        title: 'السائق وصل',
+        subtitle: 'يرجى التوجه إلى موقع الالتقاء',
+      ),
+    );
+  }
+
+
+
+  void _showFinishedSheet() {
+    showModalBottomSheet(
+      context: context,
+      isDismissible: false,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _StatusSheet(
+        icon: Icons.check_circle,
+        title: 'انتهت الرحلة',
+        subtitle: 'نتمنى لك رحلة سعيدة 🌸',
+      ),
+    );
+  }
+
+  bool _socketReady = false;
+
+  Future<void> _initSocket() async {
+    if (_socketReady) return;
+    // ✅ اسمع لوكيشن السائق (driver:location:update)
+    socketEvents.listenToDriverTracking((data) {
+      if (!mounted || data == null) return;
+
+      // حماية وتحويل types
+      final int? rideId = (data['ride_id'] is int)
+          ? data['ride_id']
+          : int.tryParse('${data['ride_id']}');
+
+      if (rideId == null) return;
+
+      // إذا بدك تربطها بالرحلة الحالية:
+      // إذا أنت داخل هالصفحة بعد إنشاء الرحلة وعندك currentRideId:
+      if (currentRideId != null && rideId != currentRideId) return;
+
+      // إذا بدك تربطها مباشرة بصفحة (rideId) من خارج:
+      // (لكن أنت حالياً ما عندك rideId هنا، عندك currentRideId)
+      // فخلّينا على currentRideId.
+
+      final double lat = ((data['lat'] ?? data['latitude']) as num).toDouble();
+      final double lng = ((data['lng'] ?? data['longitude']) as num).toDouble();
+
+      final newPos = LatLng(lat, lng);
+
+      setState(() {
+        driverLatLng = newPos;
+      });
+
+      // ✅ (اختياري) حدّث مسار السائق -> نقطة الانطلاق
+      _debouncedUpdateDriverRoute(newPos);
+
+      // ✅ (اختياري) حرّك الكاميرا شوي على السائق (بدون إزعاج)
+      // mapController.move(newPos, mapController.camera.zoom);
     });
 
-    _getCurrentLocation();
-    // _addDriverMarkers(); // إضافة الماركرات الخاصة بالسيارات
+
+    await socketEvents.openSocketCustomerConnection();
+    void _setupRideListeners() {
+      // ✅ 1) لما السائق يقبل الرحلة
+
+
+      // ✅ 2) arriving / arrived / completed
+      socketEvents.listenToRideUpdates((data) {
+        if (!mounted || data == null) return;
+
+        final int? rideId = data['ride_id'];
+        final String? status = data['status'];
+        if (rideId == null || status == null) return;
+
+        if (rideId != currentRideId) return;
+
+        switch (status) {
+          case 'arriving':
+            _showRideStatusSheet(
+              icon: Icons.directions_car,
+              title: 'السائق في طريقه إليك',
+              subtitle: 'يرجى الاستعداد',
+            );
+            break;
+
+          case 'arrived':
+            _showRideStatusSheet(
+              icon: Icons.location_on,
+              title: 'السائق وصل',
+              subtitle: 'يرجى التوجه إلى موقع الالتقاء',
+            );
+            break;
+
+          case 'finished':
+          case 'completed':
+            _showRideStatusSheet(
+              icon: Icons.check_circle,
+              title: 'انتهت الرحلة',
+              subtitle: 'نتمنى لك رحلة سعيدة 🌸',
+            );
+
+            // ✅ أوقف أي مؤقتات/تتبع
+            _driverRouteDebounce?.cancel();
+            setState(() {
+              driverToPickupPoints = [];
+              driverLatLng = null;
+            });
+            break;
+        }
+      });
+      socketEvents.listenToDriverTracking((data) {
+        if (!mounted || data == null) return;
+
+        // حماية وتحويل types
+        final int? rideId = (data['ride_id'] is int)
+            ? data['ride_id']
+            : int.tryParse('${data['ride_id']}');
+
+        if (rideId == null) return;
+
+        // إذا بدك تربطها بالرحلة الحالية:
+        // إذا أنت داخل هالصفحة بعد إنشاء الرحلة وعندك currentRideId:
+        if (currentRideId != null && rideId != currentRideId) return;
+
+        // إذا بدك تربطها مباشرة بصفحة (rideId) من خارج:
+        // (لكن أنت حالياً ما عندك rideId هنا، عندك currentRideId)
+        // فخلّينا على currentRideId.
+
+        final double lat = ((data['lat'] ?? data['latitude']) as num).toDouble();
+        final double lng = ((data['lng'] ?? data['longitude']) as num).toDouble();
+
+        final newPos = LatLng(lat, lng);
+
+        setState(() {
+          driverLatLng = newPos;
+        });
+
+        // ✅ (اختياري) حدّث مسار السائق -> نقطة الانطلاق
+        _debouncedUpdateDriverRoute(newPos);
+
+        // ✅ (اختياري) حرّك الكاميرا شوي على السائق (بدون إزعاج)
+        // mapController.move(newPos, mapController.camera.zoom);
+      });
+    }
+
+
+
+    Future<void> _loadDriverToPickupRoute(LatLng driver, LatLng pickup) async {
+      try {
+        final result = await _getRouteWithMeta(
+          driver.latitude,
+          driver.longitude,
+          pickup.latitude,
+          pickup.longitude,
+        );
+
+        if (!mounted) return;
+        setState(() {
+          driverToPickupPoints = result.points;
+        });
+      } catch (_) {
+        // تجاهل
+      }
+    }
+
+    _socketReady = true;
+
     socketEvents.listenToNearbyDrivers((drivers) {
-      final markers = drivers.map((driver) {
+      final markers = drivers.map<Marker>((driver) {
+        final lat = ((driver['lat'] ?? driver['latitude']) as num).toDouble();
+        final lng = ((driver['lng'] ?? driver['longitude']) as num).toDouble();
+
         return Marker(
-          markerId: MarkerId("driver_${driver['driver_id']}"),
-          position: LatLng(
-            driver['lat'],
-            driver['lng'],
-          ),
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            BitmapDescriptor.hueBlue,
-          ),
+          point: LatLng(lat, lng),
+          width: 44,
+          height: 44,
+          child: const _DriverMarkerWidget(),
         );
       }).toSet();
 
-      setState(() {
-        driverMarkers = markers;
-      });
+      if (!mounted) return;
+      setState(() => driverMarkers = markers);
+    });
+
+    _fetchNearbyDrivers(startLatLng.latitude, startLatLng.longitude);
+
+    _nearbyTimer?.cancel();
+    _setupRideListeners();
+    _nearbyTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      _fetchNearbyDrivers(startLatLng.latitude, startLatLng.longitude);
     });
   }
 
-  void _fetchNearbyDrivers(double lat, double lng) {
-    socketEvents.getNearbyDrivers(
-      pickUpLat: lat,
-      pickUpLng: lng,
-    );
-  }
+  Timer? _nearbyTimer;
 
-  // إضافة الماركرات الخاصة بالسيارات المتواجدة
-  void _addDriverMarkers() {
-    for (int i = 0; i < drivers.length; i++) {
-      _markers.add(
-        Marker(
-          markerId: MarkerId('driver_$i'), // تعيين معرف فريد لكل سيارة
-          position: drivers[i],
-          icon: driverIcon, // تخصيص الأيقونة
-          infoWindow: InfoWindow(
-            title: "سيارة ${i + 1}",
-            snippet: "الموقع: ${drivers[i].latitude}, ${drivers[i].longitude}",
-          ),
-        ),
-      );
-    }
-  }
-
+  // @override
+  // void dispose() {
+  //   _nearbyTimer?.cancel();
+  //   _locationTimer?.cancel();
+  //   super.dispose();
+  // }
   @override
   void dispose() {
-    polyAnimController.dispose();
+    _nearbyTimer?.cancel();
+    _locationTimer?.cancel();
+    _driverRouteDebounce?.cancel();
+    _rideSheetController?.close();
     super.dispose();
   }
 
-  Future<void> _getCurrentLocation() async {
-    bool serviceEnabled;
-    LocationPermission permission;
 
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      return;
-    }
+  // =========================
+  // OSRM Route (points + distance + duration)
+  // =========================
+  Future<void> _loadRoute() async {
+    setState(() => loadingRoute = true);
 
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission != LocationPermission.whileInUse &&
-          permission != LocationPermission.always) {
-        return;
-      }
-    }
-
-    Position position = await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
-    );
-
-    setState(() {
-      startPoint = LatLng(position.latitude, position.longitude);
-      _markers.add(
-        Marker(
-          markerId: const MarkerId('start'),
-          position: startPoint!,
-          icon: startIcon,
-        ),
+    try {
+      final result = await _getRouteWithMeta(
+        widget.startLatitude,
+        widget.startLongitude,
+        widget.endLatitude,
+        widget.endLongitude,
       );
-      // يمكنك تحديث الكاميرا على الموقع الجديد
-      _controller.future.then((controller) {
-        controller.animateCamera(CameraUpdate.newLatLngZoom(startPoint!, 14));
+
+      if (!mounted) return;
+
+      setState(() {
+        routePoints = result.points;
+        routeDistanceMeters = result.distanceMeters;
+        routeDurationSeconds = result.durationSeconds;
+        loadingRoute = false;
       });
-    });
-  }
 
-  void _addMarker(LatLng pos) async {
-    setState(() {
-      if (startPoint == null) {
-        startPoint = pos;
-        _markers.add(
-          Marker(
-            markerId: const MarkerId('start'),
-            position: pos,
-            icon: startIcon,
-          ),
+      // Fit bounds (فقط إذا في نقاط)
+      if (routePoints.length >= 2) {
+        final bounds = LatLngBounds.fromPoints(routePoints);
+        mapController.fitCamera(
+          CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(50)),
         );
-      } else if (endPoint == null) {
-        endPoint = pos;
-        _markers.add(
-          Marker(markerId: const MarkerId('end'), position: pos, icon: endIcon),
-        );
-        _getGraphhopperRoute();
-        _getServerDistance();
       } else {
-        _markers.clear();
-        _polylines.clear();
-        animatedRoute.clear();
-        startPoint = pos;
-        endPoint = null;
-        serverResult = null;
-        graphDistance = "";
-        graphDuration = "";
-        _markers.add(
-          Marker(
-            markerId: const MarkerId('start'),
-            position: pos,
-            icon: startIcon,
-          ),
-        );
+        mapController.move(startLatLng, 14);
       }
-    });
-  }
-  Timer? _locationTimer;
-  void _startSendingLocationInRide() {
-    _locationTimer = Timer.periodic(
-      const Duration(seconds: 5),
-          (timer) async {
-        try {
-          final position = await Geolocator.getCurrentPosition(
-            desiredAccuracy: LocationAccuracy.high,
-          );
-          final String? customerIdStr = Cachenetwork.getdata("user_id");
-          if (customerIdStr == null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text("خطأ: لم يتم العثور على بيانات المستخدم")),
-            );
-            return;
-          }
-
-          final int customerId = int.parse(customerIdStr);
-          socketEvents.sendCustomerLocation(
-              customerId: customerId, // ID السائق
-              lat: position.latitude,
-              lng: position.longitude,
-              rideId:currentRideId!
-          );
-        } catch (e) {
-          debugPrint('❌ Error getting location: $e');
-        }
-      },);}
-
-  Future<void> _getGraphhopperRoute() async {
-    if (startPoint == null || endPoint == null) return;
-
-    final data = await graphhopper.getRoute(start: startPoint!, end: endPoint!);
-    if (data == null) return;
-
-    final path = data["paths"][0];
-    graphDistance = "${(path["distance"] / 1000).toStringAsFixed(2)} كم";
-    graphDuration = "${(path["time"] / 60000).toStringAsFixed(0)} دقيقة";
-
-    List coords = path["points"]["coordinates"];
-    List<LatLng> polyPoints = coords.map((c) => LatLng(c[1], c[0])).toList();
-
-    setState(() {
-      _polylines.clear();
-      _polylines.add(
-        Polyline(
-          polylineId: const PolylineId('route'),
-          points: polyPoints,
-          color: Colors.black,
-          width: 4,
-        ),
-      );
-    });
-
-    animatedRoute.clear();
-    polyAnimController.forward(from: 0);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => loadingRoute = false);
+    }
   }
 
-  Future<void> _getServerDistance() async {
-    if (startPoint == null || endPoint == null) return;
+  // ✅ NEW: return points + distance + duration
+  Future<_OsrmRouteResult> _getRouteWithMeta(
+      double startLat,
+      double startLon,
+      double endLat,
+      double endLon,
+      ) async {
+    final url =
+        "http://route.gocab.org/route/v1/driving/"
+        "$startLon,$startLat;$endLon,$endLat"
+        "?overview=full&steps=true&geometries=geojson";
 
-    final result = await apiService.getDistance(
-      from: startPoint!,
-      to: endPoint!,
+    final response = await http.get(Uri.parse(url));
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to load route');
+    }
+
+    final data = jsonDecode(response.body);
+    final routes = data["routes"] as List?;
+    if (routes == null || routes.isEmpty) {
+      throw Exception("No routes found");
+    }
+
+    final route = routes[0];
+    final distance = (route["distance"] as num).toDouble(); // meters
+    final duration = (route["duration"] as num).toDouble(); // seconds
+
+    final coords = route["geometry"]["coordinates"] as List;
+    final points = coords
+        .map<LatLng>(
+          (c) => LatLng((c[1] as num).toDouble(), (c[0] as num).toDouble()),
+    )
+        .toList();
+
+    return _OsrmRouteResult(
+      points: points,
+      distanceMeters: distance,
+      durationSeconds: duration,
     );
+  }
+
+  // =========================
+  // Nearby drivers (socket)
+  // =========================
+  void _fetchNearbyDrivers(double lat, double lng) {
+    socketEvents.getNearbyDrivers(pickUpLat: lat, pickUpLng: lng);
+  }
+
+  // =========================
+  // Server distance (RouteCard)
+  // =========================
+  Future<void> _getServerDistance() async {
+    final from = gml.LatLng(startLatLng.latitude, startLatLng.longitude);
+    final to = gml.LatLng(endLatLng.latitude, endLatLng.longitude);
+
+    final result = await apiService.getDistance(from: from, to: to);
+    if (!mounted) return;
     if (result != null) setState(() => serverResult = result);
   }
 
-  void _confirmTrip() async{
-    if (startPoint != null && endPoint != null) {
-      await _showPriceAdjustmentSheet(); // هنا بنفتح البوتم شي
-
-    } else {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("حدد نقطتين أولًا")));
-    }
-
-
-
-
-
-    // if (startPoint != null && endPoint != null) {
-    //   ScaffoldMessenger.of(
-    //     context,
-    //   ).showSnackBar(const SnackBar(content: Text("تم تأكيد الرحلة")));
-    //   Navigator.of(context).push(
-    //     MaterialPageRoute(
-    //       builder: (_) => MockOffersScreen(),
-    //     ),
-    //   );
-    // }
+  // =========================
+  // Confirm Trip (نفس شغلك)
+  // =========================
+  void _confirmTrip() async {
+    await _showPriceAdjustmentSheet();
   }
 
+  void _startSendingLocationInRide() {
+    _locationTimer?.cancel();
+    _locationTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
+      try {
+        final position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+        );
+        final String? customerIdStr = Cachenetwork.getdata("user_id");
+        if (customerIdStr == null) return;
 
+        final int customerId = int.parse(customerIdStr);
+        socketEvents.sendCustomerLocation(
+          customerId: customerId,
+          lat: position.latitude,
+          lng: position.longitude,
+          rideId: currentRideId!,
+        );
+      } catch (_) {}
+    });
+  }
 
+  Future<void> _showPriceAdjustmentSheet() async {
+    // ✅ NEW: السعر التقديري الدقيق من OSRM
+    final meters = routeDistanceMeters;
+    final estimated = meters == null ? null : _estimatePriceFromMeters(meters);
 
-
-   _showPriceAdjustmentSheet() {
-    int price = serverResult?.calculated_price ?? 20000;
+    // ✅ خلي السعر الابتدائي = التقديري (أولوية) ثم serverResult ثم default
+    int price = estimated ?? serverResult?.calculated_price ?? 20000;
 
     showModalBottomSheet(
       context: context,
@@ -335,76 +884,160 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  /// التحكم بالسعر
+                  // ✅ NEW: عرض السعر التقديري والمسافة والوقت قبل التحكم
+                  if (routeDistanceMeters != null &&
+                      routeDurationSeconds != null)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            "تفاصيل الرحلة",
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            "من: ${widget.startPoint}",
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            "إلى: ${widget.endPoint}",
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  "المسافة: ${_formatDistance(routeDistanceMeters!)}",
+                                ),
+                              ),
+                              Expanded(
+                                child: Text(
+                                  "الوقت: ${_formatDuration(routeDurationSeconds!)}",
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              const Text(
+                                "السعر التقديري: ",
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              Text(
+                                "${estimated ?? price} ل.س",
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  const SizedBox(height: 14),
+
+                  // ====== UI التحكم بالسعر (نفسه ما انحذف) ======
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       IconButton(
-                        onPressed: () {
-                          setModalState(() {
-                            price = (price - 1000).clamp(0, double.infinity).toInt();
-                          });
-                        },
-                        icon: const Icon(Icons.remove_circle, color: Colors.red, size: 36),
+                        onPressed: () => setModalState(() {
+                          price = (price - 1000)
+                              .clamp(0, double.infinity)
+                              .toInt();
+                        }),
+                        icon: const Icon(
+                          Icons.remove_circle,
+                          color: Colors.red,
+                          size: 36,
+                        ),
                       ),
                       const SizedBox(width: 20),
                       Text(
                         "$price ل.س",
-                        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(width: 20),
                       IconButton(
-                        onPressed: () {
-                          setModalState(() {
-                            price += 1000;
-                          });
-                        },
-                        icon: const Icon(Icons.add_circle, color: Colors.green, size: 36),
+                        onPressed: () => setModalState(() => price += 1000),
+                        icon: const Icon(
+                          Icons.add_circle,
+                          color: Colors.green,
+                          size: 36,
+                        ),
                       ),
                     ],
                   ),
 
                   const SizedBox(height: 24),
 
+                  // ====== زر جلب السائقين (نفسه) ======
                   ElevatedButton(
                     onPressed: () async {
                       try {
-                        // إنشاء الرحلة
                         final rideServices = RideApiService();
+
+                        // ✅ NEW: استخدم المسافة والوقت الحقيقيين إن توفروا
+                        final distanceKm = (routeDistanceMeters ?? 0) / 1000.0;
+                        final durationSec = (routeDurationSeconds ?? 0).toInt();
+
                         final response = await rideServices.createRide(
-                          startAddress: "المزة",
-                          endAddress: "الميدان",
-                          distance: 25.2,
-                          estimatedDuration: 2500,
+                          startAddress: widget.startPoint,
+                          endAddress: widget.endPoint,
+                          distance: distanceKm == 0 ? 25.2 : distanceKm,
+                          estimatedDuration: durationSec == 0
+                              ? 2500
+                              : durationSec,
                           estimatedPrice: price.toDouble(),
                         );
 
                         currentRideId = response.data.rideId;
 
-
-
                         await socketEvents.openSocketCustomerConnection();
                         socketEvents.newRide(
-                          pickupAddress: "المزة",
-                          dropOffAddress: "الميدان",
-                          distance: 25.2,
-                          estimatedDuration: 2500,
-                          estimatedPrice: price.toDouble()
+                          pickupAddress: widget.startPoint,
+                          dropOffAddress: widget.endPoint,
+                          distance: distanceKm == 0 ? 25.2 : distanceKm,
+                          estimatedDuration: durationSec == 0
+                              ? 2500
+                              : durationSec,
+                          estimatedPrice: price.toDouble(),
                         );
 
                         _startSendingLocationInRide();
 
-                        // جلب السائقين من الباك
                         final driversResponse = await fetchDrivers();
-                        final List<DriverData> drivers = driversResponse?.data ?? [];
+                        final List<DriverData> drivers =
+                            driversResponse?.data ?? [];
 
-
-
-                        Navigator.pop(context); // اغلاق البوتم شيت
+                        if (!mounted) return;
+                        Navigator.pop(context);
                         _showDriverSearchSheet(price: price, drivers: drivers);
-                      } catch (e) {
+                      } catch (_) {
+                        if (!mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text("فشل إنشاء الرحلة أو جلب السائقين")),
+                          const SnackBar(
+                            content: Text("فشل إنشاء الرحلة أو جلب السائقين"),
+                          ),
                         );
                       }
                     },
@@ -419,9 +1052,11 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     );
   }
 
-  void _showDriverSearchSheet({required dynamic price, required List<DriverData> drivers}) {
+  void _showDriverSearchSheet({
+    required dynamic price,
+    required List<DriverData> drivers,
+  }) {
     int currentCount = drivers.length;
-    List<DriverData> displayList = currentCount > 3 ? drivers.sublist(0, 3) : drivers;
 
     showModalBottomSheet(
       context: context,
@@ -450,27 +1085,32 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                 ),
               ),
               const SizedBox(height: 16),
-
-              /// صور السائقين + عددهم
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
                     "عدد السائقين: $currentCount",
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   SizedBox(
                     height: 40,
                     width: 120,
                     child: Stack(
                       children: [
-                        for (int i = 0; i < (currentCount > 3 ? 3 : currentCount); i++)
+                        for (
+                        int i = 0;
+                        i < (currentCount > 3 ? 3 : currentCount);
+                        i++
+                        )
                           Positioned(
                             left: i * 28,
                             child: const CircleAvatar(
                               radius: 18,
                               backgroundImage: NetworkImage(
-                                "https://i.pravatar.cc/150?img=1", // صورة واحدة افتراضية لكل السائقين
+                                "https://i.pravatar.cc/150?img=1",
                               ),
                             ),
                           ),
@@ -482,7 +1122,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                               backgroundColor: Colors.grey.shade300,
                               child: Text(
                                 "+${currentCount - 3}",
-                                style: const TextStyle(fontWeight: FontWeight.bold),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           ),
@@ -491,7 +1133,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                   ),
                 ],
               ),
-
               const SizedBox(height: 16),
               const Text(
                 "اضغط على الزر لبدء البحث عن أقرب السائقين المتاحين.",
@@ -499,18 +1140,18 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                 style: TextStyle(fontSize: 16, color: Colors.black54),
               ),
               const SizedBox(height: 25),
-
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () async{
+                  onPressed: () async {
+                    socketEvents.sendCustomerPickupLocation(
+                      pickupLat: startLatLng.latitude,
+                      pickupLng: startLatLng.longitude,
+                    );
+                    socketEvents.joinRide(rideId: currentRideId!);
 
-                    socketEvents.sendCustomerPickupLocation(pickupLat: startPoint!.latitude, pickupLng: startPoint!.longitude);
-                                            socketEvents.joinRide(rideId: currentRideId!);
-
-
-                    // socketEvents.listenToAvailableDrivers();
-                     Navigator.pop(context);
+                    if (!mounted) return;
+                    Navigator.pop(context);
                     setState(() => showDriversOverlay = true);
                   },
                   style: ElevatedButton.styleFrom(
@@ -536,41 +1177,130 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
     );
   }
 
+  // =========================
+  // Markers
+  // =========================
+  // List<Marker> _buildMarkers() {
+  //   final markers = <Marker>[
+  //     Marker(
+  //       point: startLatLng,
+  //       width: 46,
+  //       height: 46,
+  //       child: const _StartMarkerWidget(),
+  //     ),
+  //     Marker(
+  //       point: endLatLng,
+  //       width: 46,
+  //       height: 46,
+  //       child: const _EndMarkerWidget(),
+  //     ),
+  //   ];
+  //
+  //   markers.addAll(driverMarkers);
+  //
+  //   return markers;
+  // }
+  List<Marker> _buildMarkers() {
+    final markers = <Marker>[
+      // ✅ الزبون (نقطة البداية)
+      Marker(
+        point: startLatLng,
+        width: 46,
+        height: 46,
+        child: const _StartMarkerWidget(),
+      ),
+
+      // ✅ الوجهة (نقطة النهاية)
+      Marker(
+        point: endLatLng,
+        width: 46,
+        height: 46,
+        child: const _EndMarkerWidget(),
+      ),
+    ];
+
+    // ✅ السائق الحقيقي فقط
+    if (driverLatLng != null) {
+      markers.add(
+        Marker(
+          point: driverLatLng!,
+          width: 46,
+          height: 46,
+          child: const _DriverMarkerWidget(),
+        ),
+      );
+    }
+
+    return markers;
+  }
 
 
 
   @override
   Widget build(BuildContext context) {
+    final markers = _buildMarkers();
+
     return Stack(
       children: [
         Scaffold(
-          appBar: AppBar(title: const Text("حدد نقطتين على الخريطة")),
+          key: _scaffoldKey,
+          appBar: AppBar(title: const Text("المسار")),
           body: Stack(
             children: [
-              GoogleMap(
-                initialCameraPosition: _initialPosition,
-                onMapCreated: (controller) => _controller.complete(controller),
-                markers: {
-                  ..._markers,
-                  ...driverMarkers,
-                },
+              FlutterMap(
+                mapController: mapController,
+                options: MapOptions(
+                  initialCenter: startLatLng,
+                  initialZoom: 14,
+                  minZoom: 3,
+                  maxZoom: 19,
+                  // 🚫 لا onTap => ما في تحديد نقاط
+                ),
+                children: [
+                  TileLayer(
+                    urlTemplate: tilesUrlTemplate,
+                    userAgentPackageName: 'com.example.map',
+                  ),
 
-                polylines: {
-                  if (animatedRoute.isNotEmpty)
-                    Polyline(
-                      polylineId: const PolylineId('animate'),
-                      points: animatedRoute,
-                      width: 4,
-                      color: Colors.black,
+                  // ✅ Polyline فقط إذا فيه نقاط كفاية
+                  if (routePoints.length >= 2)
+                    PolylineLayer(
+                      polylines: [
+                        Polyline(
+                          points: routePoints,
+                          color: Colors.black,
+                          strokeWidth: 3,
+                        ),
+                      ],
                     ),
-                },
-                onTap: _addMarker,
-                myLocationEnabled: true,
-                zoomControlsEnabled: true,
+                  // ✅ مسار السائق -> نقطة الانطلاق
+                  if (driverToPickupPoints.length >= 2)
+                    PolylineLayer(
+                      polylines: [
+                        Polyline(
+                          points: driverToPickupPoints,
+                          color: Colors.blue,
+                          strokeWidth: 4,
+                        ),
+                      ],
+                    ),
+
+
+                  MarkerLayer(markers: markers),
+                ],
               ),
+
+              if (loadingRoute)
+                const Positioned.fill(
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+
+
+
+              // ✅ RouteCard تبعك (ما انحذف) بس نزّلناه شوي لتجنب التداخل
               if (serverResult != null)
                 Positioned(
-                  top: 10,
+                  top: 150,
                   left: 0,
                   right: 0,
                   child: RouteCard(
@@ -582,41 +1312,160 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin {
                 ),
             ],
           ),
-          bottomNavigationBar: Padding(
-            padding: const EdgeInsets.all(12),
-            child: ElevatedButton(
-              onPressed: _confirmTrip,
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                backgroundColor: Colors.green,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text(
-                "تأكيد الرحلة",
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ),
         ),
 
         if (showDriversOverlay)
           Positioned.fill(
             child: Container(
-              color: Colors.black.withOpacity(0.5), // خلفية شفافة على الخريطة
+              color: Colors.black.withOpacity(0.5),
               child: MockOffersScreen(
                 rideId: currentRideId!,
                 price: (serverResult?.calculated_price ?? 20000).toDouble(),
                 onClose: () => setState(() => showDriversOverlay = false),
+
+                startPoint: widget.startPoint,
+                endPoint: widget.endPoint,
+                startLat: widget.startLatitude,
+                startLng: widget.startLongitude,
+                endLat: widget.endLatitude,
+                endLng: widget.endLongitude,
               ),
+
             ),
           ),
       ],
     );
   }
 }
+
+// =========================
+// Local model for OSRM result
+// =========================
+class _OsrmRouteResult {
+  final List<LatLng> points;
+  final double distanceMeters;
+  final double durationSeconds;
+
+  _OsrmRouteResult({
+    required this.points,
+    required this.distanceMeters,
+    required this.durationSeconds,
+  });
+}
+
+// =========================
+// Marker widgets
+// =========================
+
+class _StartMarkerWidget extends StatelessWidget {
+  const _StartMarkerWidget();
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        Container(
+          width: 26,
+          height: 26,
+          decoration: BoxDecoration(
+            color: Colors.green.withOpacity(0.22),
+            shape: BoxShape.circle,
+          ),
+        ),
+        const Icon(Icons.location_pin, color: Colors.green, size: 40),
+      ],
+    );
+  }
+}
+
+class _EndMarkerWidget extends StatelessWidget {
+  const _EndMarkerWidget();
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        Container(
+          width: 26,
+          height: 26,
+          decoration: BoxDecoration(
+            color: Colors.red.withOpacity(0.22),
+            shape: BoxShape.circle,
+          ),
+        ),
+        const Icon(Icons.flag, color: Colors.red, size: 36),
+      ],
+    );
+  }
+}
+
+class _DriverMarkerWidget extends StatelessWidget {
+  const _DriverMarkerWidget();
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        Container(
+          width: 26,
+          height: 26,
+          decoration: BoxDecoration(
+            color: Colors.blue.withOpacity(0.20),
+            shape: BoxShape.circle,
+          ),
+        ),
+        const Icon(Icons.directions_car, color: Colors.blue, size: 28),
+      ],
+    );
+  }
+}
+
+
+class _StatusSheet extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  const _StatusSheet({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 5,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade400,
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Icon(icon, size: 48, color: Colors.blue),
+          const SizedBox(height: 12),
+          Text(
+            title,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Text(subtitle, style: const TextStyle(color: Colors.grey)),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+}
+

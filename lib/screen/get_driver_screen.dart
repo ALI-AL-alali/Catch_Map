@@ -6,7 +6,7 @@ import 'package:map/core/const/endpoint.dart';
 import 'package:map/screen/map_screen.dart';
 import 'package:map/services/create_ride_api.dart';
 
-import '../core/helpers/socket_events.dart';
+import '../core/helpers/socket_events.dart' hide MapScreen;
 import '../core/utils/cachenetwork.dart';
 import '../models/driver_available_model.dart';
 
@@ -115,12 +115,12 @@ class _AnimatedDriverCardState extends State<AnimatedDriverCard> with TickerProv
     });
 
     _startTimer();
+
   }
 
   void _startTimer() {
     _timer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
       if (!mounted) return;
-
       setState(() {
         remainingSeconds -= 0.1;
         if (remainingSeconds <= 0) {
@@ -426,8 +426,14 @@ class MockOffersScreen extends StatefulWidget {
   final VoidCallback? onClose;
   final int rideId;
   final double price;
+  final String startPoint;
+  final String endPoint;
+  final double startLat;
+  final double startLng;
+  final double endLat;
+  final double endLng;
 
-  const MockOffersScreen({super.key, this.onClose, required this.rideId, required this.price});
+  const MockOffersScreen({super.key, this.onClose, required this.rideId, required this.price, required this.startPoint, required this.endPoint, required this.startLat, required this.startLng, required this.endLat, required this.endLng});
 
   @override
   State<MockOffersScreen> createState() => _MockOffersScreenState();
@@ -511,6 +517,9 @@ class _MockOffersScreenState extends State<MockOffersScreen> {
     );
   }
 
+  String? acceptedDriverId;
+
+
   PersistentBottomSheetController? _bottomSheetController;
   @override
   void initState() {
@@ -519,66 +528,59 @@ class _MockOffersScreenState extends State<MockOffersScreen> {
     _initSocket();
 
 
+    bool showDriversOverlay = false;
 
 
-
+    // داخل _initSocket()
     socketEvents.listenToRideAccepted((data) {
-      if (!mounted) return;
+      if (!mounted || data == null) return;
 
-      final int? rideId = data['ride_id'];
-      final int? finalPrice = data['final_price'];
+      final int? rideId = (data['ride_id'] is int)
+          ? data['ride_id']
+          : int.tryParse('${data['ride_id']}');
 
-      if (rideId == null) {
-        debugPrint('❌ ride_id missing from backend');
-        return;
-      }
+      final String? driverId = data['driver_id']?.toString();
 
-      if (rideId != widget.rideId) return;
+      if (rideId == null || rideId != widget.rideId) return;
 
-
-      showModalBottomSheet(
-        context: context,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        builder: (_) => Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade400,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Icon(Icons.check_circle, color: Colors.green, size: 48),
-              const SizedBox(height: 12),
-              const Text(
-                'تم قبول الرحلة من قبل السائق',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Text('السعر النهائي: ${finalPrice ?? '--'} ل.س'),
-            ],
-          ),
-        ),
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم قبول الرحلة من قبل السائق')),
       );
+
+      // ✅ سكّر overlay قبل ما تنتقل
+      widget.onClose?.call();
+
+      // ✅ انتقل لصفحة الخريطة مع بيانات الرحلة الحقيقية
+      Future.microtask(() {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => MapScreen(
+              startPoint: widget.startPoint,
+              endPoint: widget.endPoint,
+              startLatitude: widget.startLat,
+              startLongitude: widget.startLng,
+              endLatitude: widget.endLat,
+              endLongitude: widget.endLng,
+              // إذا بدك مرّر rideId/driverId كمان (حسب MapScreen عندك)
+            ),
+          ),
+        );
+      });
     });
 
+
+
     _listenToRideStatus();
+    // socketEvents.startLocationTracking(rideId: widget.rideId,driverId: item.driverId);
+
+
 
 
   }
 
 
-   _listenToRideStatus() {
+  _listenToRideStatus() {
     socketEvents.listenToRideUpdates((data) {
       if (!mounted || data == null) return;
 
@@ -604,6 +606,7 @@ class _MockOffersScreenState extends State<MockOffersScreen> {
 
       case 'finished':
       case 'completed':
+        socketEvents.stopLocationTracking();
         _showFinishedSheet();
         break;
     }
@@ -692,6 +695,8 @@ class _MockOffersScreenState extends State<MockOffersScreen> {
       customerId: customerId,
       price: item.driverPrice!.toDouble(),
     );
+
+    // socketEvents.startLocationTracking(rideId: widget.rideId,driverId: item.driverId);
 
 
 
@@ -788,6 +793,7 @@ class _MockOffersScreenState extends State<MockOffersScreen> {
   @override
   void dispose() {
     for (var offer in activeOffers) offer.cancelTimer();
+    socketEvents.stopLocationTracking();
     super.dispose();
   }
 
@@ -811,27 +817,27 @@ class _MockOffersScreenState extends State<MockOffersScreen> {
               Expanded(
                 child: activeOffers.isEmpty
                     ? const Center(
-                        child: Text(
-                          "جاري جلب العروض...",
-                          style: TextStyle(color: Colors.white, fontSize: 18),
-                        ),
-                      )
+                  child: Text(
+                    "جاري جلب العروض...",
+                    style: TextStyle(color: Colors.white, fontSize: 18),
+                  ),
+                )
                     : ListView.builder(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        itemCount: activeOffers.length,
-                        itemBuilder: (_, index) {
-                          final item = activeOffers[index];
-                          return AnimatedDriverCard(
-                            key: ValueKey(item.driverId),
-                              socketEvents: socketEvents,
-                             rideId: widget.rideId,
-                            driverItem: item,
-                            onAccept: () => _acceptOffer(item),
-                            onReject: () => _removeOfferItem(item),
-                            onPriceUpdated: () => _removeOfferItem(item),
-                          );
-                        },
-                      ),
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  itemCount: activeOffers.length,
+                  itemBuilder: (_, index) {
+                    final item = activeOffers[index];
+                    return AnimatedDriverCard(
+                      key: ValueKey(item.driverId),
+                      socketEvents: socketEvents,
+                      rideId: widget.rideId,
+                      driverItem: item,
+                      onAccept: () => _acceptOffer(item),
+                      onReject: () => _removeOfferItem(item),
+                      onPriceUpdated: () => _removeOfferItem(item),
+                    );
+                  },
+                ),
               ),
             ],
           ),

@@ -42,6 +42,80 @@ class MapRoutePage extends StatefulWidget {
 }
 
 class _MapRoutePageState extends State<MapRoutePage> {
+
+
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  PersistentBottomSheetController? _rideSheetController;
+
+  String? acceptedDriverId;
+  LatLng? driverLatLng;
+
+// Route: driver -> pickup
+  List<LatLng> driverToPickupPoints = [];
+  bool loadingDriverToPickup = false;
+
+  Timer? _driverRouteDebounce;
+  LatLng? _lastDriverRouteFrom;
+
+
+
+  void _showRideStatusSheet({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    bool dismissible = true,
+  }) {
+    // سكّر أي sheet قديم
+    _rideSheetController?.close();
+
+    _rideSheetController = _scaffoldKey.currentState?.showBottomSheet(
+          (context) => _StatusSheet(icon: icon, title: title, subtitle: subtitle),
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+    );
+
+    if (!dismissible) {
+      // إذا بدك تمنع السحب، بتقدر تتركه modal بدل showBottomSheet
+      // بس هيك غالباً كفاية للمشروع
+    }
+  }
+  void _debouncedUpdateDriverRoute(LatLng driverPos) {
+    // إذا ما تغيّر كثير، ما في داعي نعيد route
+    if (_lastDriverRouteFrom != null) {
+      final dx = (driverPos.latitude - _lastDriverRouteFrom!.latitude).abs();
+      final dy = (driverPos.longitude - _lastDriverRouteFrom!.longitude).abs();
+      if (dx < 0.0002 && dy < 0.0002) return; // ~20-30m تقريباً
+    }
+
+    _driverRouteDebounce?.cancel();
+    _driverRouteDebounce = Timer(const Duration(milliseconds: 600), () async {
+      _lastDriverRouteFrom = driverPos;
+      await _loadDriverToPickupRoute(driverPos, startLatLng);
+    });
+  }
+
+  Future<void> _loadDriverToPickupRoute(LatLng driver, LatLng pickup) async {
+    try {
+      final result = await _getRouteWithMeta(
+        driver.latitude,
+        driver.longitude,
+        pickup.latitude,
+        pickup.longitude,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        driverToPickupPoints = result.points;
+      });
+    } catch (_) {
+      // تجاهل
+    }
+  }
+
+
+
   // ===== Map =====
   final MapController mapController = MapController();
   static const String tilesUrlTemplate =
@@ -120,6 +194,76 @@ class _MapRoutePageState extends State<MapRoutePage> {
     if (_socketReady) return;
 
     await socketEvents.openSocketCustomerConnection();
+    void _setupRideListeners() {
+      // ✅ 1) لما السائق يقبل الرحلة
+
+
+      // ✅ 2) arriving / arrived / completed
+      socketEvents.listenToRideUpdates((data) {
+        if (!mounted || data == null) return;
+
+        final int? rideId = data['ride_id'];
+        final String? status = data['status'];
+        if (rideId == null || status == null) return;
+
+        if (rideId != currentRideId) return;
+
+        switch (status) {
+          case 'arriving':
+            _showRideStatusSheet(
+              icon: Icons.directions_car,
+              title: 'السائق في طريقه إليك',
+              subtitle: 'يرجى الاستعداد',
+            );
+            break;
+
+          case 'arrived':
+            _showRideStatusSheet(
+              icon: Icons.location_on,
+              title: 'السائق وصل',
+              subtitle: 'يرجى التوجه إلى موقع الالتقاء',
+            );
+            break;
+
+          case 'finished':
+          case 'completed':
+            _showRideStatusSheet(
+              icon: Icons.check_circle,
+              title: 'انتهت الرحلة',
+              subtitle: 'نتمنى لك رحلة سعيدة 🌸',
+            );
+
+            // ✅ أوقف أي مؤقتات/تتبع
+            _driverRouteDebounce?.cancel();
+            setState(() {
+              driverToPickupPoints = [];
+              driverLatLng = null;
+            });
+            break;
+        }
+      });
+    }
+
+
+
+    Future<void> _loadDriverToPickupRoute(LatLng driver, LatLng pickup) async {
+      try {
+        final result = await _getRouteWithMeta(
+          driver.latitude,
+          driver.longitude,
+          pickup.latitude,
+          pickup.longitude,
+        );
+
+        if (!mounted) return;
+        setState(() {
+          driverToPickupPoints = result.points;
+        });
+      } catch (_) {
+        // تجاهل
+      }
+    }
+
     _socketReady = true;
 
     socketEvents.listenToNearbyDrivers((drivers) {
@@ -142,6 +286,7 @@ class _MapRoutePageState extends State<MapRoutePage> {
     _fetchNearbyDrivers(startLatLng.latitude, startLatLng.longitude);
 
     _nearbyTimer?.cancel();
+    _setupRideListeners();
     _nearbyTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       _fetchNearbyDrivers(startLatLng.latitude, startLatLng.longitude);
     });
@@ -149,12 +294,21 @@ class _MapRoutePageState extends State<MapRoutePage> {
 
   Timer? _nearbyTimer;
 
+  // @override
+  // void dispose() {
+  //   _nearbyTimer?.cancel();
+  //   _locationTimer?.cancel();
+  //   super.dispose();
+  // }
   @override
   void dispose() {
     _nearbyTimer?.cancel();
     _locationTimer?.cancel();
+    _driverRouteDebounce?.cancel();
+    _rideSheetController?.close();
     super.dispose();
   }
+
 
   // =========================
   // OSRM Route (points + distance + duration)
@@ -196,11 +350,11 @@ class _MapRoutePageState extends State<MapRoutePage> {
 
   // ✅ NEW: return points + distance + duration
   Future<_OsrmRouteResult> _getRouteWithMeta(
-    double startLat,
-    double startLon,
-    double endLat,
-    double endLon,
-  ) async {
+      double startLat,
+      double startLon,
+      double endLat,
+      double endLon,
+      ) async {
     final url =
         "http://route.gocab.org/route/v1/driving/"
         "$startLon,$startLat;$endLon,$endLat"
@@ -226,7 +380,7 @@ class _MapRoutePageState extends State<MapRoutePage> {
     final points = coords
         .map<LatLng>(
           (c) => LatLng((c[1] as num).toDouble(), (c[0] as num).toDouble()),
-        )
+    )
         .toList();
 
     return _OsrmRouteResult(
@@ -527,9 +681,9 @@ class _MapRoutePageState extends State<MapRoutePage> {
                     child: Stack(
                       children: [
                         for (
-                          int i = 0;
-                          i < (currentCount > 3 ? 3 : currentCount);
-                          i++
+                        int i = 0;
+                        i < (currentCount > 3 ? 3 : currentCount);
+                        i++
                         )
                           Positioned(
                             left: i * 28,
@@ -606,6 +760,26 @@ class _MapRoutePageState extends State<MapRoutePage> {
   // =========================
   // Markers
   // =========================
+  // List<Marker> _buildMarkers() {
+  //   final markers = <Marker>[
+  //     Marker(
+  //       point: startLatLng,
+  //       width: 46,
+  //       height: 46,
+  //       child: const _StartMarkerWidget(),
+  //     ),
+  //     Marker(
+  //       point: endLatLng,
+  //       width: 46,
+  //       height: 46,
+  //       child: const _EndMarkerWidget(),
+  //     ),
+  //   ];
+  //
+  //   markers.addAll(driverMarkers);
+  //
+  //   return markers;
+  // }
   List<Marker> _buildMarkers() {
     final markers = <Marker>[
       Marker(
@@ -622,7 +796,20 @@ class _MapRoutePageState extends State<MapRoutePage> {
       ),
     ];
 
-    markers.addAll(driverMarkers);
+    // ✅ ماركر السائق الحقيقي (بعد قبول الرحلة)
+    if (driverLatLng != null) {
+      markers.add(
+        Marker(
+          point: driverLatLng!,
+          width: 46,
+          height: 46,
+          child: const _DriverMarkerWidget(),
+        ),
+      );
+    } else {
+      // قبل القبول خلي القريبين مثل ما كنت
+      markers.addAll(driverMarkers);
+    }
 
     return markers;
   }
@@ -684,6 +871,7 @@ class _MapRoutePageState extends State<MapRoutePage> {
     return Stack(
       children: [
         Scaffold(
+          key: _scaffoldKey,
           appBar: AppBar(title: const Text("المسار")),
           body: Stack(
             children: [
@@ -713,6 +901,18 @@ class _MapRoutePageState extends State<MapRoutePage> {
                         ),
                       ],
                     ),
+                  // ✅ مسار السائق -> نقطة الانطلاق
+                  if (driverToPickupPoints.length >= 2)
+                    PolylineLayer(
+                      polylines: [
+                        Polyline(
+                          points: driverToPickupPoints,
+                          color: Colors.blue,
+                          strokeWidth: 4,
+                        ),
+                      ],
+                    ),
+
 
                   MarkerLayer(markers: markers),
                 ],
@@ -772,6 +972,13 @@ class _MapRoutePageState extends State<MapRoutePage> {
                 rideId: currentRideId!,
                 price: (serverResult?.calculated_price ?? 20000).toDouble(),
                 onClose: () => setState(() => showDriversOverlay = false),
+
+                startPoint: widget.startPoint,
+                endPoint: widget.endPoint,
+                startLat: widget.startLatitude,
+                startLng: widget.startLongitude,
+                endLat: widget.endLatitude,
+                endLng: widget.endLongitude,
               ),
             ),
           ),
@@ -861,6 +1068,52 @@ class _DriverMarkerWidget extends StatelessWidget {
         ),
         const Icon(Icons.directions_car, color: Colors.blue, size: 28),
       ],
+    );
+  }
+}
+
+
+class _StatusSheet extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  const _StatusSheet({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 5,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade400,
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Icon(icon, size: 48, color: Colors.blue),
+          const SizedBox(height: 12),
+          Text(
+            title,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Text(subtitle, style: const TextStyle(color: Colors.grey)),
+          const SizedBox(height: 20),
+        ],
+      ),
     );
   }
 }
